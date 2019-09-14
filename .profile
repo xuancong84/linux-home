@@ -1,5 +1,13 @@
 # ~/.profile: executed by the command interpreter for login shells.
 
+if [ -s ~/.bashrc ]; then
+	source ~/.bashrc
+fi
+
+if [ ! "$DISPLAY" ]; then
+	export DISPLAY=localhost:0
+fi
+
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 export HISTSIZE=1000000
