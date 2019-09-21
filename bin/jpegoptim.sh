@@ -2,7 +2,7 @@
 set -e -o pipefail
 
 if [ $# == 0 ]; then
-	echo "Usage: $0 input-file/input-folder output-folder [-m60]"
+	echo "Usage: $0 input-file/input-folder output-folder [-m70]"
 	echo "It converts recursively, preserving folder structure and filenames"
 	exit
 fi
@@ -20,10 +20,8 @@ fi
 if [ "$3" ]; then
 	opt="$3"
 else
-	opt="-m60"
+	opt="-m70"
 fi
-
-mkdir -p $output
 
 find $input -iregex ".*.jpe?g" | while read line; do
 	outpath=$output/`dirname "${line:$len}"`
