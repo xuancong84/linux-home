@@ -4,6 +4,7 @@ if [ $# -lt 2 ]; then
 	echo "Usage: $0 input.mp4/input-folder output.mp4/output-folder [bitrate=2600k] [preset=slow]"
 	echo "Preset levels are: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo"
 	echo "If the output-folder ends with a slash, it will skip existing non-empty files"
+	exit 1
 fi
 
 set +e
