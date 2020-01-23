@@ -1,4 +1,19 @@
+#!/bin/bash
 
-youtube-dl -f bestvideo -o ~/beiwe-backend/files/yt1.mp4 --merge-output-format mp4 $1
-mv ~/beiwe-backend/files/yt1.mp4 ~/beiwe-backend/files/yt.mp4
+if [ $# == 0 ]; then
+	echo "Usage: $0 <youtube-URL> [output-file] [\"format-options\"]"
+	exit 1
+fi
+
+opt=
+if [ $# -ge 2 ]; then
+	opt="-o $2"
+fi
+
+fopt="-f bestvideo+mp4"
+if [ $# -ge 3 ]; then
+	aopt="$3"
+fi
+
+youtube-dl $fopt $opt $1
 
