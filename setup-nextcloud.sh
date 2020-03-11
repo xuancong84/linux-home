@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Global parameters
+DB_NAME=mohtncdb
+DB_USER=mohtuser
+DB_PSWD='abcd1234!@#$'
+INST_PATH=/usr/share
+
 if [ $# == 0 ]; then
 	echo "Usage: $0 nextcloud.tar.gz [port] [DNS] [IP]"
 	echo "This will install nextcloud into the current directory, please goto install path first."
@@ -11,11 +17,22 @@ if [ "`whoami`" != root ]; then
 	exit 1
 fi
 
+# check pre-requisite
+if [ ! "`dpkg -l php7.3-fpm`" ]; then
+	echo "Error: php7.3-fpm is not installed!"
+	exit 1
+elif [ ! "`which mariadb`" ]; then
+	echo "Error: mariadb is not installed!"
+	exit 1
+elif [ ! "`which nginx`" ]; then
+	echo "Error: nginx is not installed"
+	exit 1
+fi
 
 set -e -x -o pipefail
 
 # refresh all files
-#cd /usr/share
+cd "$INST_PATH"
 rm -rf nextcloud
 tar -xf "$1"
 chown -R www-data:www-data nextcloud
@@ -23,12 +40,12 @@ chown -R www-data:www-data nextcloud
 
 # init MySQL
 set +e
-mariadb -u root -e "drop database nextcloud_db;"
-mariadb -u root -e "drop user user@localhost;"
+mariadb -u root -e "drop database $DB_NAME;"
+mariadb -u root -e "drop user $DB_USER@localhost;"
 
-mariadb -u root -e "create database nextcloud_db;"
-mariadb -u root -e "create user user@localhost identified by 'p@ssw0rd';"
-mariadb -u root -e "grant all privileges on nextcloud_db.* to user@localhost identified by 'p@ssw0rd';"
+mariadb -u root -e "create database $DB_NAME;"
+mariadb -u root -e "create user $DB_USER@localhost identified by '$DB_PSWD';"
+mariadb -u root -e "grant all privileges on $DB_NAME.* to $DB_USER@localhost identified by '$DB_PSWD';"
 mariadb -u root -e "flush privileges;"
 set -e
 
