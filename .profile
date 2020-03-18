@@ -27,6 +27,9 @@ alias p='ps aux | l'
 alias ka='killall.sh'
 alias ac='zcat -f'
 
+# multi-line sed
+alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
+
 shopt -s direxpand
 
 export PYTHONSTARTUP="$HOME/.pythonrc"
