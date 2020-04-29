@@ -26,9 +26,13 @@ alias c='cat'
 alias p='ps aux | l'
 alias ka='killall.sh'
 alias ac='zcat -f'
+alias killstop='kill $(jobs -p)'
 
 # multi-line sed
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
+
+# python 3 test
+alias py3="python3 -i -c \"import os,sys,re,math;import pandas as pd;import numpy as np;from collections import *\""
 
 shopt -s direxpand
 
