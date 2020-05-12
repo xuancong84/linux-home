@@ -27,6 +27,7 @@ alias p='ps aux | l'
 alias ka='killall.sh'
 alias ac='zcat -f'
 alias killstop='kill $(jobs -p)'
+alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
 
 # multi-line sed
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
