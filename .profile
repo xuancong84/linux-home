@@ -28,6 +28,7 @@ alias ka='killall.sh'
 alias ac='zcat -f'
 alias killstop='kill $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
+alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
 
 # multi-line sed
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
@@ -37,5 +38,8 @@ alias py3="python3 -i -c \"import os,sys,re,math;import pandas as pd;import nump
 
 shopt -s direxpand
 
-export PYTHONSTARTUP="$HOME/.pythonrc"
+# `less` can view archives directly (.tar.gz, .zip, etc.)
+export LESSOPEN="| /usr/bin/lesspipe %s";
+export LESSCLOSE="/usr/bin/lesspipe %s %s";
 
+export PS1="\[\e]0;\u@\h: \w\a\]\[\e[1;35m\]\u\[\e[0m\]@\[\e[1;36m\]\H\[\e[0m\]:\[\e[1;32m\]\w\[\e[0m\]\[\e[1;32m\]$\[\e[0m\] "
