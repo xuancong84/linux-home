@@ -31,6 +31,9 @@ alias killstop='kill $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
 alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
 
+ctop() {
+    watch -n 1 "cat /proc/cpuinfo | grep '^cpu MHz'"
+}
 mdcd(){
 	mkdir -p "$1" && cd "$1"
 }
