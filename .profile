@@ -30,7 +30,33 @@ alias ac='zcat -f'
 alias killstop='kill $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
 alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
+alias sus='sudo su'
+alias sul='sudo su -l'
 
+gn() {
+    if [ $# == 0 ]; then
+        echo "Usage: gnumeric [input.csv/input.csv.gz]" >&2
+        return
+    fi
+    if [[ "$1" =~ .*gz$ ]]; then
+        RAND=$RANDOM
+        zcat -f "$1" >/tmp/$RAND.csv
+        gnumeric /tmp/$RAND.csv
+        rm -f /tmp/$RAND.csv
+    else
+        gnumeric "$1"
+    fi
+}
+create_ssl_x509() {
+	if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then echo "Usage: $0 [days=3650] [encryption=rsa:2048] [output-prefix=ssl(.key+.crt)]" >&2; return; fi
+	days=3650
+	if [ "$1" ]; then days="$1"; fi
+	enc="rsa:2048"
+	if [ "$2" ]; then enc="$2"; fi
+	out=ssl
+	if [ "$3" ]; then out="$3"; fi
+	openssl req -x509 -sha256 -nodes -days $days -newkey $enc -keyout $out.key -out $out.crt
+}
 ctop() {
     watch -n 1 "cat /proc/cpuinfo | grep '^cpu MHz'"
 }
@@ -48,7 +74,7 @@ set_intel() {
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
 
 # python 3 test
-alias py3="python3 -i -c \"import os,sys,re,math;import pandas as pd;import numpy as np;from collections import *\""
+alias py3="~/anaconda3/bin/python -i -c \"import os,sys,re,math;import pandas as pd;import numpy as np;from collections import *\""
 alias apy="~/anaconda3/bin/python"
 
 shopt -s direxpand
