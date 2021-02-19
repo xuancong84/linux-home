@@ -33,6 +33,15 @@ alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
 alias sus='sudo su'
 alias sul='sudo su -l'
 
+lowercase() {
+	awk '{print tolower($0)}'
+}
+uppercase() {
+	awk '{print toupper($0)}'
+}
+random_string() {
+    cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1
+}
 gn() {
     if [ $# == 0 ]; then
         echo "Usage: gnumeric [input.csv/input.csv.gz]" >&2
