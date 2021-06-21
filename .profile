@@ -25,7 +25,7 @@ alias t='top'
 alias gtop='watch -n 1 nvidia-smi'
 alias c='cat'
 alias p='ps aux | l'
-alias ka='killall.sh'
+alias ka='killallbyname'
 alias ac='zcat -f'
 alias killstop='kill $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
@@ -33,6 +33,49 @@ alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
 alias sus='sudo su'
 alias sul='sudo su -l'
 
+killallbyname() {
+	if [ $# == 0 ]; then
+		echo -e "Usage: ${FUNCNAME[0]} proc-search-pattern [-N]
+This kills all processes having a command line matching the \033[1;31mgrep\033[0m pattern.
+N: signal for the kill
+0 - ? 
+1 - SIGHUP - ?, controlling terminal closed, 
+2 - SIGINT - interupt process stream, ctrl-C 
+3 - SIGQUIT - like ctrl-C but with a core dump, interuption by error in code, ctl-/ 
+4 - SIGILL 
+5 - SIGTRAP 
+6 - SIGABRT 
+7 - SIGBUS 
+8 - SIGFPE 
+9 - SIGKILL - terminate immediately/hard kill, use when 15 doesn't work or when something disasterous might happen if process is allowed to cont., kill -9 
+10 - SIGUSR1 
+11 - SIGEGV 
+12 - SIGUSR2
+13 - SIGPIPE 
+14 - SIGALRM
+15 - SIGTERM - terminate whenever/soft kill, typically sends SIGHUP as well? 
+16 - SIGSTKFLT 
+17 - SIGCHLD 
+18 - SIGCONT - Resume process, ctrl-Z (2nd)
+19 - SIGSTOP - Pause the process / free command line, ctrl-Z (1st)
+20 - SIGTSTP 
+21 - SIGTTIN 
+22 - SIGTTOU
+23 - SIGURG
+24 - SIGXCPU
+25 - SIGXFSZ
+26 - SIGVTALRM
+27 - SIGPROF
+28 - SIGWINCH
+29 - SIGIO 
+29 - SIGPOLL 
+30 - SIGPWR - shutdown, typically from unusual hardware failure 
+31 - SIGSYS" >&2
+		return 0
+	else
+		ps aux | grep "$1" | sed '/grep/d' | xargs kill $2
+	fi
+}
 lowercase() {
 	awk '{print tolower($0)}'
 }
