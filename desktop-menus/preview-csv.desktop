@@ -1,0 +1,19 @@
+[Desktop Entry]
+Version=1.0
+Name=Preview CSV
+GenericName=Preview CSV
+X-GNOME-FullName=Preview CSV
+Comment=Preview the first few lines of a CSV
+Keywords=Preview;CSV;Spreadsheet;
+Exec=/usr/local/bin/preview-csv.sh %U
+Icon=gnumeric
+Terminal=false
+Type=Application
+Categories=Office;Spreadsheet;Science;Math;GNOME;GTK;
+StartupNotify=true
+X-GNOME-Bugzilla-Bugzilla=GNOME
+X-GNOME-Bugzilla-Product=Gnumeric
+X-GNOME-Bugzilla-Version=1.12.44
+X-GNOME-Bugzilla-Component=General
+X-GNOME-DocPath=gnumeric
+MimeType=text/csv;application/csv;application/csv.gz;
