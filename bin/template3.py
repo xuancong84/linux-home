@@ -3,6 +3,13 @@
 
 import os,sys,argparse,re
 
+
+def Open(fn, mode='r', **kwargs):
+	if fn == '-':
+		return sys.stdin if mode.startswith('r') else sys.stdout
+	fn = os.path.expanduser(fn)
+	return gzip.open(fn, mode, **kwargs) if fn.lower().endswith('.gz') else open(fn, mode, **kwargs)
+
 if __name__=='__main__':
 	parser = argparse.ArgumentParser(usage='$0 arg1 1>output 2>progress', description='what this program does',
 			formatter_class=argparse.ArgumentDefaultsHelpFormatter)
