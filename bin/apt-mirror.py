@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # coding=utf-8
 
-import os, sys, argparse, re, gzip, hashlib, requests, fnmatch, signal
+import os, sys, argparse, re, gzip, hashlib, requests, fnmatch, signal, lzma, io
 from glob import glob
 from collections import *
 
@@ -11,17 +11,24 @@ def signal_handler(sig, frame):
 	isExiting = True
 	print('\nCtrl+C pressed, please wait while finish downloading the current file!', flush = True)
 
-def Open(fn, mode = 'r', **kwargs):
+def Open(fn, mode = 'rt', **kwargs):
 	if fn == '-':
 		return sys.stdin if mode.startswith('r') else sys.stdout
-	fn = os.path.expanduser(fn)
-	return gzip.open(fn, mode, **kwargs) if fn.lower().endswith('.gz') else open(fn, mode, **kwargs)
+	elif fn.lower().endswith('.gz'):
+		return gzip.open(fn, mode, **kwargs)
+	elif fn.lower().endswith('.xz'):
+		return lzma.open(fn, mode, **kwargs)
+	return open(fn, mode, **kwargs)
 
-def OpenPrefix(fn, mode = 'r', **kwargs):
-	return Open(fn, mode, **kwargs) if os.path.isfile(fn) else Open(fn+'.gz', mode, **kwargs)
+def OpenPrefix(fn, mode = 'rt', **kwargs):
+	flist = [afn for afn in [fn, fn+'.gz', fn+'.xz'] if os.path.isfile(afn)]
+	if not flist:
+		print('Skip: none of these files exists '+str([fn, fn+'.gz', fn+'.xz']), flush = True)
+		return io.StringIO()
+	return Open(flist[0], mode, **kwargs)
 
 strip_http = lambda s: re.sub('^https*://', '', s)
-make_path = lambda its: os.path.expanduser(re.sub(r'/+', '/', '/'.join([strip_http(s) for s in its])).rstrip('/'))
+make_path = lambda its: re.sub(r'/+', '/', '/'.join([strip_http(s) for s in its])).rstrip('/')
 
 def wget_recurse_all(outdir, param):
 	return os.system("wget -N -r -np -l 9999 -P %s --reject-regex '.*\?.*' %s" % (outdir, param.rstrip('/')+'/'))
@@ -37,7 +44,14 @@ def wget_file(outdir, file_url):
 # parse the Release file
 def parse_Release(fn):
 	Ls = Open(fn).read().splitlines()
-	n_start = Ls.index('MD5Sum:')+1
+	if 'MD5Sum:' in Ls:
+		n_start = Ls.index('MD5Sum:')+1
+	elif 'SHA1:' in Ls:
+		n_start = Ls.index('SHA1:')+1
+	elif 'SHA256:' in Ls:
+		n_start = Ls.index('SHA256:') + 1
+	else:
+		sys.exit('Fatal: No hash checksum found in '+fn)
 	ret = []
 	for L in Ls[n_start:]:
 		its = L.split()
@@ -47,15 +61,28 @@ def parse_Release(fn):
 
 # parse the Package file
 def parse_Packages(fn):
-	ret, ret1 = [], {}
+	ret, d = [], {}
 	for L in OpenPrefix(fn).readlines():
 		if not L.strip():
-			ret += [[ret1[k] for k in ['md5sum', 'size', 'filename']]]
+			keys = [k for k in ['md5sum', 'sha1', 'sha256'] if k in d]
+			if not keys:
+				sys.exit('Fatal: No hash checksum found in '+fn)
+			ret += [[d[keys[0]], d['size'], d['filename']]]
 			continue
 		its = L.split(':')
 		if len(its)==2:
-			ret1[its[0].strip().lower()] = its[1].strip()
+			d[its[0].strip().lower()] = its[1].strip()
 	return ret
+
+def verify_checksum(fullpath, cksum):
+	fdata = open(fullpath, 'rb').read()
+	if len(cksum)==32:
+		return cksum == hashlib.md5(fdata).hexdigest()
+	elif len(cksum)==40:
+		return cksum == hashlib.sha1(fdata).hexdigest()
+	elif len(cksum)==64:
+		return cksum == hashlib.sha256(fdata).hexdigest()
+	sys.exit('Unknown checksum for file ' + fullpath)
 
 # check filesize and md5, and download it if mismatch
 _progress_spin = '-\\|/'
@@ -74,13 +101,23 @@ def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
 			print('\nCtrl+C pressed, exiting!', flush = True)
 			sys.exit(0)
 
+		if n%5 == 0:
+			print('\r%d / %d *' % (n, N), end = '\b', flush = True)
+
+		# Skip download if file size and checksum matches
 		fullpath = make_path([rel_path, fn])
-		if os.path.isfile(fullpath) and os.path.getsize(fullpath) == int(sz) \
-			and md5 == hashlib.md5(Open(fullpath, 'rb').read()).hexdigest():
+		if os.path.isfile(fullpath) and os.path.getsize(fullpath) == int(sz) and verify_checksum(fullpath, md5):
 			n += 1
 			continue
 
-		print('\r%d / %d' % (n, N), end = ' ', flush = True)
+		# If file size is 0, delete the file if it already exists
+		if sz==0 and os.path.isfile(fullpath):
+			try: os.remove(fullpath)
+			except: pass
+			n += 1
+			continue
+
+		print('\r%d / %d %s' % (n, N, _progress_spin[0]), end = '\b', flush = True)
 		full_url = url_prefix+fn
 		try:
 			i = 0
@@ -113,8 +150,11 @@ if __name__ == '__main__':
 	opt = parser.parse_args()
 	globals().update(vars(opt))
 
+	output_dir = os.path.expanduser(output_dir)
+	inputs = [os.path.expanduser(i) for i in inputs]
+
 	# 1. gather all deb lines from all *.list
-	deb_lines = [L.strip() for patn in inputs for f in glob(os.path.expanduser(patn)) for L in Open(f).readlines() if L.strip().startswith('deb')]
+	deb_lines = [L.strip() for patn in inputs for f in glob(patn) for L in Open(f).readlines() if L.strip().startswith('deb')]
 
 	# 2. organize data structures
 	repos = defaultdict(lambda: set())
@@ -194,8 +234,11 @@ if __name__ == '__main__':
 				if not fn.endswith('/Packages'): continue
 				pkg_filename = make_path([output_dir, url, 'dists', dist, fn])
 				md5_sz_fn_list = parse_Packages(pkg_filename)
-				print('Downloading packages in', pkg_filename, '...', flush = True)
-				checked_download(url, md5_sz_fn_list, output_dir)
+				if md5_sz_fn_list:
+					print('Downloading packages in', pkg_filename, '...', flush = True)
+					checked_download(url, md5_sz_fn_list, output_dir)
+				else:
+					print('There are 0 packages in', pkg_filename, '=> Skip', flush = True)
 				print(flush = True)
 
 
