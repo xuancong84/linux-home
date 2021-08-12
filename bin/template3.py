@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # coding=utf-8
 
-import os,sys,argparse,re
+import os,sys,argparse,re,gzip
 
 
 def Open(fn, mode='r', **kwargs):

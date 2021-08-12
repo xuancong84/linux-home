@@ -30,8 +30,17 @@ alias ac='zcat -f'
 alias killstop='kill $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
 alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
-alias sus='sudo su'
+alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
 alias sul='sudo su -l'
+
+adb_broadcast() {
+	if [ $# == 0 ]; then
+		echo "Usage: $0 <file-fullpath>"
+		echo "This make all apps aware of the media file newly copied to Android; <file-fullpath> must starts with /sdcard/"
+		return 1
+	fi
+	adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://$1
+}
 
 killallbyname() {
 	if [ $# == 0 ]; then

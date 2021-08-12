@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+# coding=utf-8
+
+import os, sys, argparse, re, gzip, hashlib, requests, fnmatch, signal
+from glob import glob
+from collections import *
+
+isExiting = False
+def signal_handler(sig, frame):
+	global isExiting
+	isExiting = True
+	print('\nCtrl+C pressed, please wait while finish downloading the current file!', flush = True)
+
+signal.signal(signal.SIGINT, signal_handler)
+
+def Open(fn, mode = 'r', **kwargs):
+	if fn == '-':
+		return sys.stdin if mode.startswith('r') else sys.stdout
+	fn = os.path.expanduser(fn)
+	return gzip.open(fn, mode, **kwargs) if fn.lower().endswith('.gz') else open(fn, mode, **kwargs)
+
+def OpenPrefix(fn, mode = 'r', **kwargs):
+	return Open(fn, mode, **kwargs) if os.path.isfile(fn) else Open(fn+'.gz', mode, **kwargs)
+
+strip_http = lambda s: re.sub('^https*://', '', s)
+make_path = lambda its: re.sub(r'/+', '/', '/'.join([strip_http(s) for s in its])).rstrip('/')
+
+def wget_recurse_all(outdir, param):
+	os.system("wget -N -r -np -l 9999 -P %s --reject-regex '.*\?.*' %s" % (outdir, param.rstrip('/')+'/'))
+
+def wget_current_dir(outdir, param):
+	os.system("wget -N -r -np -l 1    -P %s --reject-regex '(.*\?.*)|($1/.*/.*)' %s" % (outdir, param.rstrip('/')+'/'))
+
+# parse the Release file
+def parse_Release(fn):
+	Ls = Open(fn).read().splitlines()
+	n_start = Ls.index('MD5Sum:')+1
+	ret = []
+	for L in Ls[n_start:]:
+		its = L.split()
+		if len(its) != 3: break
+		ret += [its]
+	return ret
+
+# parse the Package file
+def parse_Packages(fn):
+	ret, ret1 = [], {}
+	for L in OpenPrefix(fn).readlines():
+		if not L.strip():
+			ret += [[ret1[k] for k in ['md5sum', 'size', 'filename']]]
+			continue
+		its = L.split(':')
+		if len(its)==2:
+			ret1[its[0].strip().lower()] = its[1].strip()
+	return ret
+
+# check filesize and md5, and download it if mismatch
+_progress_spin = '-\\|/'
+def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
+	global isExiting
+	url_prefix = url_prefix.rstrip('/')+'/'
+	rel_path = make_path([output_dir, url_prefix])
+	N, n = len(md5_sz_fn_list), 0
+	for md5, sz, fn in md5_sz_fn_list:
+		if isExiting:
+			print('\nCtrl+C pressed, exiting!', flush = True)
+			sys.exit(0)
+
+		fullpath = make_path([rel_path, fn])
+		if os.path.isfile(fullpath) and os.path.getsize(fullpath) == int(sz) \
+			and md5 == hashlib.md5(open(fullpath, 'rb').read()).hexdigest():
+			n += 1
+			continue
+
+		print('\r%d / %d' % (n, N), end = ' ', flush = True)
+		full_url = url_prefix+fn
+		try:
+			i = 0
+			with requests.get(full_url, stream = True) as r:
+				r.raise_for_status()
+				full_name = make_path([output_dir, full_url])
+				os.makedirs(os.path.dirname(full_name), exist_ok = True)
+				with open(full_name, 'wb') as f:
+					for chunk in r.iter_content(chunk_size = 1048576):
+						f.write(chunk)
+						i += 1
+						print(_progress_spin[i % len(_progress_spin)], end = '\b', flush = True)
+		except:
+			pass
+		n += 1
+	print('\r%d / %d'%(n, N), flush = True)
+
+
+if __name__ == '__main__':
+	parser = argparse.ArgumentParser(usage = '$0 output_directory [options] 1>output 2>progress', description = 'Python-version apt-mirror',
+	                                 formatter_class = argparse.ArgumentDefaultsHelpFormatter)
+	parser.add_argument('output_dir', help = 'output directory')
+	parser.add_argument('--inputs', '-i', help = 'input sources.list (by default, it uses your system settings in /etc/apt/*)', nargs = '+',
+	                    default = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'])
+	parser.add_argument('-optional', help = 'optional argument')
+	# nargs='?': optional positional argument; action='append': multiple instances of the arg; type=; default=
+	opt = parser.parse_args()
+	globals().update(vars(opt))
+
+	# 1. gather all deb lines from all *.list
+	deb_lines = [L.strip() for patn in inputs for f in glob(patn) for L in open(f).readlines() if L.strip().startswith('deb')]
+
+	# 2. organize data structures
+	repos = defaultdict(lambda: set())
+	for L in deb_lines:
+		# parse, extract, and remove options from L
+		try:
+			L1, opt = L, {}
+			for options in re.findall(r'\[[^]]*\]', L):
+				for option in options[1:-1].split():
+					k, v = option.split('=')
+					if k=='arch' or k=='arch+':
+						opt[k] = v.split(',')
+					elif k=='arch-':
+						opt[k] = ['!'+i for i in v.split(',')]
+				L1 = L1.replace(options, '')
+
+			its = L1.split()
+			opt['source'] = its[0].endswith('-src')
+			for pool in its[3:]:
+				repos[its[1]+' '+its[2]].add(pool+' '+str(opt))
+		except:
+			print('Malformed line:', L)
+
+	# 3. clone every repo
+	contain_arch = lambda fn, arch: re.search(r'-%s[./-]' % arch, fn) or fn.endswith('-' + arch)
+	for url_dist, pool_options in repos.items():
+
+		# DEBUG
+		# if url_dist!='http://deb.debian.org/debian buster': continue
+		# pool_options = set(["main {'source': True}"])
+
+
+		url, dist = url_dist.split()
+		url = url.rstrip('/')
+		url_nohttp = re.sub(r'^https*://', '', url)
+
+		# Firstly, download the distrib root index with timestamp awareness
+		wget_current_dir(output_dir, '%s/dists/%s/'%(url, dist))
+
+		# Parse the Release file
+		level1 = parse_Release('%s/%s/dists/%s/Release'%(output_dir, url_nohttp, dist))
+
+		for pool_option in pool_options:
+			pool, option = pool_option.split(' ', 1)
+			option = eval(option)
+
+			# For deb-src, only download the entire <dist>/<pool>/source/ folder and all -source
+			if option.get('source', False):
+				wget_recurse_all(output_dir, '%s/dists/%s/%s/source/' % (url, dist, pool))
+				flist = [(md5, file_size, file_name) for md5, file_size, file_name in level1 if file_name.startswith(pool+'/') and '-source' in file_name]
+				checked_download('%s/dists/%s/' % (url, dist), flist, output_dir)
+				continue
+
+			# If arch is specified, build exclusion patterns
+			exclude_patns = []
+			for patn in option.get('arch', []):
+				for md5, file_size, file_name in level1:
+					if contain_arch(file_name, patn):
+						exclude_patns += [file_name.replace(patn, '%s')]
+				break
+
+			# Fetch level2 indices
+			flist = []
+			for md5, file_size, file_name in level1:
+				if not file_name.startswith(pool+'/'): continue
+				if '/source/' in file_name: continue
+				if [1 for patn in exclude_patns if fnmatch.fnmatch(file_name, patn%'*') and file_name not in [patn%arch for arch in option['arch']]]:
+					continue
+				flist += [[md5, file_size, file_name]]
+			print('Fetching Level 2 indices for', url, dist, pool, '...', flush = True)
+			checked_download('%s/dists/%s/' % (url, dist), flist, output_dir)
+
+
+			# Secondly, download the distrib's pool index with timestamp awareness
+			for _, _, fn in flist:
+				if not fn.endswith('/Packages'): continue
+				pkg_filename = make_path([output_dir, url, 'dists', dist, fn])
+				md5_sz_fn_list = parse_Packages(pkg_filename)
+				print('Downloading packages in', pkg_filename, '...', flush = True)
+				checked_download(url, md5_sz_fn_list, output_dir)
+				print(flush = True)
+
+
+
+
