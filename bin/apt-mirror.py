@@ -11,8 +11,6 @@ def signal_handler(sig, frame):
 	isExiting = True
 	print('\nCtrl+C pressed, please wait while finish downloading the current file!', flush = True)
 
-signal.signal(signal.SIGINT, signal_handler)
-
 def Open(fn, mode = 'r', **kwargs):
 	if fn == '-':
 		return sys.stdin if mode.startswith('r') else sys.stdout
@@ -23,13 +21,18 @@ def OpenPrefix(fn, mode = 'r', **kwargs):
 	return Open(fn, mode, **kwargs) if os.path.isfile(fn) else Open(fn+'.gz', mode, **kwargs)
 
 strip_http = lambda s: re.sub('^https*://', '', s)
-make_path = lambda its: re.sub(r'/+', '/', '/'.join([strip_http(s) for s in its])).rstrip('/')
+make_path = lambda its: os.path.expanduser(re.sub(r'/+', '/', '/'.join([strip_http(s) for s in its])).rstrip('/'))
 
 def wget_recurse_all(outdir, param):
-	os.system("wget -N -r -np -l 9999 -P %s --reject-regex '.*\?.*' %s" % (outdir, param.rstrip('/')+'/'))
+	return os.system("wget -N -r -np -l 9999 -P %s --reject-regex '.*\?.*' %s" % (outdir, param.rstrip('/')+'/'))
 
 def wget_current_dir(outdir, param):
-	os.system("wget -N -r -np -l 1    -P %s --reject-regex '(.*\?.*)|($1/.*/.*)' %s" % (outdir, param.rstrip('/')+'/'))
+	return os.system("wget -N -r -np -l 1    -P %s --reject-regex '(.*\?.*)|($1/.*/.*)' %s" % (outdir, param.rstrip('/')+'/'))
+
+def wget_file(outdir, file_url):
+	out_fullpath = make_path([outdir, file_url])
+	os.makedirs(os.path.dirname(out_fullpath), exist_ok = True)
+	return os.system("wget -O %s %s" % (out_fullpath, file_url))
 
 # parse the Release file
 def parse_Release(fn):
@@ -58,6 +61,11 @@ def parse_Packages(fn):
 _progress_spin = '-\\|/'
 def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
 	global isExiting
+
+	# Set Ctrl+C handler
+	old_sig = signal.getsignal(signal.SIGINT)
+	signal.signal(signal.SIGINT, signal_handler)
+
 	url_prefix = url_prefix.rstrip('/')+'/'
 	rel_path = make_path([output_dir, url_prefix])
 	N, n = len(md5_sz_fn_list), 0
@@ -68,7 +76,7 @@ def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
 
 		fullpath = make_path([rel_path, fn])
 		if os.path.isfile(fullpath) and os.path.getsize(fullpath) == int(sz) \
-			and md5 == hashlib.md5(open(fullpath, 'rb').read()).hexdigest():
+			and md5 == hashlib.md5(Open(fullpath, 'rb').read()).hexdigest():
 			n += 1
 			continue
 
@@ -88,6 +96,9 @@ def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
 		except:
 			pass
 		n += 1
+
+	# Restore Ctrl+C handler
+	signal.signal(signal.SIGINT, old_sig)
 	print('\r%d / %d'%(n, N), flush = True)
 
 
@@ -103,7 +114,7 @@ if __name__ == '__main__':
 	globals().update(vars(opt))
 
 	# 1. gather all deb lines from all *.list
-	deb_lines = [L.strip() for patn in inputs for f in glob(patn) for L in open(f).readlines() if L.strip().startswith('deb')]
+	deb_lines = [L.strip() for patn in inputs for f in glob(os.path.expanduser(patn)) for L in Open(f).readlines() if L.strip().startswith('deb')]
 
 	# 2. organize data structures
 	repos = defaultdict(lambda: set())
@@ -141,7 +152,8 @@ if __name__ == '__main__':
 		url_nohttp = re.sub(r'^https*://', '', url)
 
 		# Firstly, download the distrib root index with timestamp awareness
-		wget_current_dir(output_dir, '%s/dists/%s/'%(url, dist))
+		if wget_current_dir(output_dir, '%s/dists/%s/'%(url, dist))!=0:
+			wget_file(output_dir, '%s/dists/%s/Release'%(url, dist))
 
 		# Parse the Release file
 		level1 = parse_Release('%s/%s/dists/%s/Release'%(output_dir, url_nohttp, dist))
