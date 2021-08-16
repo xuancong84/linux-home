@@ -2,14 +2,18 @@
 # coding=utf-8
 
 import os, sys, argparse, re, gzip, hashlib, requests, fnmatch, signal, lzma, io
+import time
 from glob import glob
 from collections import *
 
 isExiting = False
+old_sig = signal.getsignal(signal.SIGINT)
 def signal_handler(sig, frame):
-	global isExiting
+	global isExiting, old_sig
 	isExiting = True
-	print('\nCtrl+C pressed, please wait while finish downloading the current file!', flush = True)
+	print('\nCtrl+C pressed, please wait while finish downloading the current file!')
+	print('\nWarning: pressing Ctrl+C again will terminate the download, giving rise to the incomplete file', flush=True)
+	signal.signal(signal.SIGINT, old_sig)
 
 def Open(fn, mode = 'rt', **kwargs):
 	if fn == '-':
@@ -87,16 +91,15 @@ def verify_checksum(fullpath, cksum):
 # check filesize and md5, and download it if mismatch
 _progress_spin = '-\\|/'
 def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
-	global isExiting
-
-	# Set Ctrl+C handler
-	old_sig = signal.getsignal(signal.SIGINT)
-	signal.signal(signal.SIGINT, signal_handler)
+	global isExiting, checksum, old_sig, timeout
 
 	url_prefix = url_prefix.rstrip('/')+'/'
 	rel_path = make_path([output_dir, url_prefix])
 	N, n = len(md5_sz_fn_list), 0
 	for md5, sz, fn in md5_sz_fn_list:
+		# Set Ctrl+C handler
+		signal.signal(signal.SIGINT, signal_handler)
+
 		if isExiting:
 			print('\nCtrl+C pressed, exiting!', flush = True)
 			sys.exit(0)
@@ -106,7 +109,8 @@ def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
 
 		# Skip download if file size and checksum matches
 		fullpath = make_path([rel_path, fn])
-		if os.path.isfile(fullpath) and os.path.getsize(fullpath) == int(sz) and verify_checksum(fullpath, md5):
+		if os.path.isfile(fullpath) and os.path.getsize(fullpath) == int(sz) and \
+				(verify_checksum(fullpath, md5) if checksum in ['old', 'both'] else True):
 			n += 1
 			continue
 
@@ -119,19 +123,30 @@ def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
 
 		print('\r%d / %d %s' % (n, N, _progress_spin[0]), end = '\b', flush = True)
 		full_url = url_prefix+fn
-		try:
-			i = 0
-			with requests.get(full_url, stream = True) as r:
-				r.raise_for_status()
-				full_name = make_path([output_dir, full_url])
-				os.makedirs(os.path.dirname(full_name), exist_ok = True)
-				with open(full_name, 'wb') as f:
-					for chunk in r.iter_content(chunk_size = 1048576):
-						f.write(chunk)
-						i += 1
-						print(_progress_spin[i % len(_progress_spin)], end = '\b', flush = True)
-		except:
-			pass
+		i = 0
+		for fail in range(3):
+			full_name = make_path([output_dir, full_url])
+			try:
+				with requests.get(full_url, stream=True, timeout=timeout) as r:
+					r.raise_for_status()
+					os.makedirs(os.path.dirname(full_name), exist_ok = True)
+					with open(full_name, 'wb') as f:
+						for chunk in r.iter_content(chunk_size = 65536 if fail else 1048576):
+							f.write(chunk)
+							i += 1
+							print(_progress_spin[i % len(_progress_spin)], end = '\b', flush = True)
+					if checksum in ['both', 'new']:
+						if not verify_checksum(full_name, md5):
+							print('Downloaded file', full_name, 'has incorrect checksum, retry download ...')
+							continue
+					break
+			except Exception as e:
+				if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code==404:
+					break
+				print('\nError downloading', full_name, '; tried %d times'%(fail+1))
+				try: os.remove(full_name)
+				except: pass
+				time.sleep(1)
 		n += 1
 
 	# Restore Ctrl+C handler
@@ -145,7 +160,9 @@ if __name__ == '__main__':
 	parser.add_argument('output_dir', help = 'output directory')
 	parser.add_argument('--inputs', '-i', help = 'input sources.list (by default, it uses your system settings in /etc/apt/*)', nargs = '+',
 	                    default = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'])
-	parser.add_argument('-optional', help = 'optional argument')
+	parser.add_argument('--checksum', help = 'do verify checksum for existing files (old), downloaded files (new), or both (by default)',
+	                    default = 'both', choices = ['none', 'old', 'new', 'both'])
+	parser.add_argument('--timeout', '-t', help = 'connection timeout (in seconds)', default = 10, type = int)
 	# nargs='?': optional positional argument; action='append': multiple instances of the arg; type=; default=
 	opt = parser.parse_args()
 	globals().update(vars(opt))
@@ -192,7 +209,8 @@ if __name__ == '__main__':
 		url_nohttp = re.sub(r'^https*://', '', url)
 
 		# Firstly, download the distrib root index with timestamp awareness
-		if wget_current_dir(output_dir, '%s/dists/%s/'%(url, dist))!=0:
+		wget_current_dir(output_dir, '%s/dists/%s/'%(url, dist))
+		if not os.path.isfile('%s/%s/dists/%s/Release'%(output_dir, url_nohttp, dist)):
 			wget_file(output_dir, '%s/dists/%s/Release'%(url, dist))
 
 		# Parse the Release file

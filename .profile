@@ -82,7 +82,7 @@ N: signal for the kill
 31 - SIGSYS" >&2
 		return 0
 	else
-		ps aux | grep "$1" | sed '/grep/d' | xargs kill $2
+		ps aux | grep "$1" | sed '/grep/d' | awk '{print $2}' | xargs kill $2
 	fi
 }
 lowercase() {
