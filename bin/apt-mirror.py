@@ -31,6 +31,15 @@ def OpenPrefix(fn, mode = 'rt', **kwargs):
 		return io.StringIO()
 	return Open(flist[0], mode, **kwargs)
 
+def delete_file(full_name):
+	try: os.remove(full_name)
+	except: pass
+
+def makedirs(path):
+	if os.path.isfile(path):
+		delete_file(path)
+	return os.makedirs(path, exist_ok = True)
+
 strip_http = lambda s: re.sub('^https*://', '', s)
 make_path = lambda its: re.sub(r'/+', '/', '/'.join([strip_http(s) for s in its])).rstrip('/')
 
@@ -42,7 +51,7 @@ def wget_current_dir(outdir, param):
 
 def wget_file(outdir, file_url):
 	out_fullpath = make_path([outdir, file_url])
-	os.makedirs(os.path.dirname(out_fullpath), exist_ok = True)
+	makedirs(os.path.dirname(out_fullpath))
 	return os.system("wget -O %s %s" % (out_fullpath, file_url))
 
 # parse the Release file
@@ -88,6 +97,38 @@ def verify_checksum(fullpath, cksum):
 		return cksum == hashlib.sha256(fdata).hexdigest()
 	sys.exit('Unknown checksum for file ' + fullpath)
 
+def unchecked_download(input_url, output_path, filesize=None, chksum=None):
+	# output_path: if ends with /, it is treated as the default output root directory
+	#               otherwise, it is treated as the full file path
+	output_fullpath = make_path([output_path, input_url]) if output_path.endswith('/') else output_path
+	i = 0
+	for fail in range(3):
+		try:
+			with requests.get(input_url, stream = True, timeout = timeout) as r:
+				r.raise_for_status()
+				makedirs(os.path.dirname(output_fullpath))
+				with open(output_fullpath, 'wb') as f:
+					for chunk in r.iter_content(chunk_size = 65536 if fail else 1048576):
+						f.write(chunk)
+						i += 1
+						print(_progress_spin[i % len(_progress_spin)], end = '\b', flush = True)
+				if filesize is not None and os.path.getsize(output_fullpath) != int(filesize):
+					print(f'Downloaded file {output_fullpath} has incorrect size, tried {fail+1} times ...')
+					delete_file(output_fullpath)
+					continue
+				if chksum is not None and not verify_checksum(output_fullpath, chksum):
+					print(f'Downloaded file {output_fullpath} has incorrect checksum, tried {fail+1} times ...')
+					delete_file(output_fullpath)
+					continue
+				return True
+		except Exception as e:
+			if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 404:
+				break
+			print('\nError downloading', output_fullpath, '; tried %d times' % (fail + 1))
+			delete_file(output_fullpath)
+			time.sleep(1)
+	return False
+
 # check filesize and md5, and download it if mismatch
 _progress_spin = '-\\|/'
 def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
@@ -116,37 +157,12 @@ def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
 
 		# If file size is 0, delete the file if it already exists
 		if sz==0 and os.path.isfile(fullpath):
-			try: os.remove(fullpath)
-			except: pass
+			delete_file(fullpath)
 			n += 1
 			continue
 
 		print('\r%d / %d %s' % (n, N, _progress_spin[0]), end = '\b', flush = True)
-		full_url = url_prefix+fn
-		i = 0
-		for fail in range(3):
-			full_name = make_path([output_dir, full_url])
-			try:
-				with requests.get(full_url, stream=True, timeout=timeout) as r:
-					r.raise_for_status()
-					os.makedirs(os.path.dirname(full_name), exist_ok = True)
-					with open(full_name, 'wb') as f:
-						for chunk in r.iter_content(chunk_size = 65536 if fail else 1048576):
-							f.write(chunk)
-							i += 1
-							print(_progress_spin[i % len(_progress_spin)], end = '\b', flush = True)
-					if checksum in ['both', 'new']:
-						if not verify_checksum(full_name, md5):
-							print('Downloaded file', full_name, 'has incorrect checksum, retry download ...')
-							continue
-					break
-			except Exception as e:
-				if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code==404:
-					break
-				print('\nError downloading', full_name, '; tried %d times'%(fail+1))
-				try: os.remove(full_name)
-				except: pass
-				time.sleep(1)
+		unchecked_download(url_prefix+fn, fullpath, filesize = int(sz), chksum = (md5 if checksum in ['new', 'both'] else None) )
 		n += 1
 
 	# Restore Ctrl+C handler
@@ -155,14 +171,16 @@ def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
 
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(usage = '$0 output_directory [options] 1>output 2>progress', description = 'Python-version apt-mirror',
+	parser = argparse.ArgumentParser(usage = '$0 output_directory [options] 1>output 2>progress', description = 'Python3-version apt-mirror',
 	                                 formatter_class = argparse.ArgumentDefaultsHelpFormatter)
 	parser.add_argument('output_dir', help = 'output directory')
 	parser.add_argument('--inputs', '-i', help = 'input sources.list (by default, it uses your system settings in /etc/apt/*)', nargs = '+',
 	                    default = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'])
-	parser.add_argument('--checksum', help = 'do verify checksum for existing files (old), downloaded files (new), or both (by default)',
+	parser.add_argument('--checksum', help = 'verify checksum for existing files (old), downloaded files (new), or both (by default);'
+						'even though checksum verification can be disabled, file size verification will always be enabled',
 	                    default = 'both', choices = ['none', 'old', 'new', 'both'])
 	parser.add_argument('--timeout', '-t', help = 'connection timeout (in seconds)', default = 10, type = int)
+	parser.add_argument('--delete-old', '-D', help = 'delete old files in pool that are not in Level 2 index', action = 'store_true')
 	# nargs='?': optional positional argument; action='append': multiple instances of the arg; type=; default=
 	opt = parser.parse_args()
 	globals().update(vars(opt))
@@ -174,7 +192,7 @@ if __name__ == '__main__':
 	deb_lines = [L.strip() for patn in inputs for f in glob(patn) for L in Open(f).readlines() if L.strip().startswith('deb')]
 
 	# 2. organize data structures
-	repos = defaultdict(lambda: set())
+	repos = defaultdict(lambda: defaultdict(lambda : set()))
 	for L in deb_lines:
 		# parse, extract, and remove options from L
 		try:
@@ -191,74 +209,93 @@ if __name__ == '__main__':
 			its = L1.split()
 			opt['source'] = its[0].endswith('-src')
 			for pool in its[3:]:
-				repos[its[1]+' '+its[2]].add(pool+' '+str(opt))
+				repos[its[1]][its[2]].add(pool+' '+str(opt))
 		except:
 			print('Malformed line:', L)
 
 	# 3. clone every repo
 	contain_arch = lambda fn, arch: re.search(r'-%s[./-]' % arch, fn) or fn.endswith('-' + arch)
-	for url_dist, pool_options in repos.items():
+	for url, dist_pool_options in repos.items():
 
-		# DEBUG
-		# if url_dist!='http://deb.debian.org/debian buster': continue
-		# pool_options = set(["main {'source': True}"])
+		# if 'gooasdfgle' not in url: continue    # DEBUG
 
+		url_filelist = []
+		for dist, pool_options in dist_pool_options.items():
+			url = url.rstrip('/')
+			url_nohttp = re.sub(r'^https*://', '', url)
 
-		url, dist = url_dist.split()
-		url = url.rstrip('/')
-		url_nohttp = re.sub(r'^https*://', '', url)
+			# Firstly, download the distrib root index with timestamp awareness
+			wget_current_dir(output_dir, '%s/dists/%s/'%(url, dist))
+			if not os.path.isfile('%s/%s/dists/%s/Release'%(output_dir, url_nohttp, dist)):
+				unchecked_download('%s/dists/%s/Release'%(url, dist), output_dir+'/')
 
-		# Firstly, download the distrib root index with timestamp awareness
-		wget_current_dir(output_dir, '%s/dists/%s/'%(url, dist))
-		if not os.path.isfile('%s/%s/dists/%s/Release'%(output_dir, url_nohttp, dist)):
-			wget_file(output_dir, '%s/dists/%s/Release'%(url, dist))
-
-		# Parse the Release file
-		level1 = parse_Release('%s/%s/dists/%s/Release'%(output_dir, url_nohttp, dist))
-
-		for pool_option in pool_options:
-			pool, option = pool_option.split(' ', 1)
-			option = eval(option)
-
-			# For deb-src, only download the entire <dist>/<pool>/source/ folder and all -source
-			if option.get('source', False):
-				wget_recurse_all(output_dir, '%s/dists/%s/%s/source/' % (url, dist, pool))
-				flist = [(md5, file_size, file_name) for md5, file_size, file_name in level1 if file_name.startswith(pool+'/') and '-source' in file_name]
-				checked_download('%s/dists/%s/' % (url, dist), flist, output_dir)
+			if not os.path.isfile('%s/%s/dists/%s/Release' % (output_dir, url_nohttp, dist)):
+				print('SKIP: unable to download', '%s/dists/%s/Release'%(url, dist), flush = True)
 				continue
 
-			# If arch is specified, build exclusion patterns
-			exclude_patns = []
-			for patn in option.get('arch', []):
-				for md5, file_size, file_name in level1:
-					if contain_arch(file_name, patn):
-						exclude_patns += [file_name.replace(patn, '%s')]
-				break
+			# Parse the Release file
+			level1 = parse_Release('%s/%s/dists/%s/Release'%(output_dir, url_nohttp, dist))
 
-			# Fetch level2 indices
-			flist = []
-			for md5, file_size, file_name in level1:
-				if not file_name.startswith(pool+'/'): continue
-				if '/source/' in file_name: continue
-				if [1 for patn in exclude_patns if fnmatch.fnmatch(file_name, patn%'*') and file_name not in [patn%arch for arch in option['arch']]]:
+			for pool_option in pool_options:
+				pool, option = pool_option.split(' ', 1)
+				option = eval(option)
+
+				# For deb-src, only download the entire <dist>/<pool>/source/ folder and all -source
+				if option.get('source', False):
+					wget_recurse_all(output_dir, '%s/dists/%s/%s/source/' % (url, dist, pool))
+					flist = [(md5, file_size, file_name) for md5, file_size, file_name in level1 if file_name.startswith(pool+'/') and '-source' in file_name]
+					checked_download('%s/dists/%s/' % (url, dist), flist, output_dir)
 					continue
-				flist += [[md5, file_size, file_name]]
-			print('Fetching Level 2 indices for', url, dist, pool, '...', flush = True)
-			checked_download('%s/dists/%s/' % (url, dist), flist, output_dir)
+
+				# If arch is specified, build exclusion patterns
+				exclude_patns = []
+				for patn in option.get('arch', []):
+					for md5, file_size, file_name in level1:
+						if contain_arch(file_name, patn):
+							exclude_patns += [file_name.replace(patn, '%s')]
+					break
+
+				# Fetch level2 indices
+				flist = []
+				for md5, file_size, file_name in level1:
+					if not file_name.startswith(pool+'/'): continue
+					if '/source/' in file_name: continue
+					if set([(1 if file_name in [patn%arch for arch in option['arch']] else 0) for patn in exclude_patns if fnmatch.fnmatch(file_name, patn%'*')])==set([0]):
+						continue
+					flist += [[md5, file_size, file_name]]
+				print('Fetching Level 2 indices for', url, dist, pool, '...', flush = True)
+				checked_download('%s/dists/%s/' % (url, dist), flist, output_dir)
 
 
-			# Secondly, download the distrib's pool index with timestamp awareness
-			for _, _, fn in flist:
-				if not fn.endswith('/Packages'): continue
-				pkg_filename = make_path([output_dir, url, 'dists', dist, fn])
-				md5_sz_fn_list = parse_Packages(pkg_filename)
-				if md5_sz_fn_list:
-					print('Downloading packages in', pkg_filename, '...', flush = True)
-					checked_download(url, md5_sz_fn_list, output_dir)
-				else:
-					print('There are 0 packages in', pkg_filename, '=> Skip', flush = True)
-				print(flush = True)
+				# Secondly, download the distrib's pool index with timestamp awareness
+				for _, _, fn in flist:
+					if not fn.endswith('/Packages'): continue
+					pkg_filename = make_path([output_dir, url, 'dists', dist, fn])
+					md5_sz_fn_list = parse_Packages(pkg_filename)
+					if md5_sz_fn_list:
+						print('Downloading packages in', pkg_filename, '...', flush = True)
+						checked_download(url, md5_sz_fn_list, output_dir)
+						url_filelist += [make_path([output_dir, url, c]) for a, b, c in md5_sz_fn_list]
+					else:
+						print('There are 0 packages in', pkg_filename, '=> Skip', flush = True)
+					print(flush = True)
 
+		if delete_old:
+			url_fileset = set(url_filelist)
+			path_prefix = make_path([output_dir, url, 'pool'])
+			print('Deleting old files from', path_prefix, flush = True)
+			N_total = N_deleted = 0
+			for path, dir_list, file_list in os.walk(path_prefix, followlinks = True):
+				for filename in file_list:
+					N_total += 1
+					fullname = path+'/'+filename
+					if fullname not in url_fileset:
+						N_deleted += 1
+						delete_file(fullname)
+				print('%d / %d deleted  '%(N_deleted, N_total), end = '\r', flush = True)
+			print('%d / %d deleted ... Done'%(N_deleted, N_total), flush = True)
 
-
-
+	with open(output_dir+'/sources.list', 'wt') as fp:
+		for url, dist_pool_options in repos.items():
+			for dist, pool_options in dist_pool_options.items():
+				print('deb [trusted=yes] file://%s %s %s'%(make_path([output_dir, url]), dist, ' '.join([i.split()[0] for i in pool_options])), file = fp)
