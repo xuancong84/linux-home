@@ -122,10 +122,11 @@ def unchecked_download(input_url, output_path, filesize=None, chksum=None):
 					continue
 				return True
 		except Exception as e:
+			if not isinstance(e, requests.exceptions.ConnectionError):
+				delete_file(output_fullpath)
 			if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 404:
 				break
 			print('\nError downloading', output_fullpath, '; tried %d times' % (fail + 1))
-			delete_file(output_fullpath)
 			time.sleep(1)
 	return False
 
