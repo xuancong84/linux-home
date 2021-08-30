@@ -132,8 +132,8 @@ def unchecked_download(input_url, output_path, filesize=None, chksum=None):
 
 # check filesize and md5, and download it if mismatch
 _progress_spin = '-\\|/'
-def checked_download(url_prefix, md5_sz_fn_list, output_dir= ''):
-	global isExiting, checksum, old_sig, timeout
+def checked_download(url_prefix, md5_sz_fn_list, output_dir= '', checksum='both'):
+	global isExiting, old_sig, timeout
 
 	url_prefix = url_prefix.rstrip('/')+'/'
 	rel_path = make_path([output_dir, url_prefix])
@@ -179,6 +179,9 @@ if __name__ == '__main__':
 	                    default = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'])
 	parser.add_argument('--checksum', help = 'verify checksum for existing files (old), downloaded files (new), or both (by default);'
 						'even though checksum verification can be disabled, file size verification will always be enabled',
+	                    default = 'new', choices = ['none', 'old', 'new', 'both'])
+	parser.add_argument('--index-checksum', help = 'verify checksum for existing index files (old), downloaded index files (new), or both (by default);'
+                        'even though checksum verification can be disabled, file size verification will always be enabled',
 	                    default = 'both', choices = ['none', 'old', 'new', 'both'])
 	parser.add_argument('--timeout', '-t', help = 'connection timeout (in seconds)', default = 10, type = int)
 	parser.add_argument('--delete-old', '-D', help = 'delete old files in pool that are not in Level 2 index', action = 'store_true')
@@ -245,7 +248,7 @@ if __name__ == '__main__':
 				if option.get('source', False):
 					wget_recurse_all(output_dir, '%s/dists/%s/%s/source/' % (url, dist, pool))
 					flist = [(md5, file_size, file_name) for md5, file_size, file_name in level1 if file_name.startswith(pool+'/') and '-source' in file_name]
-					checked_download('%s/dists/%s/' % (url, dist), flist, output_dir)
+					checked_download('%s/dists/%s/' % (url, dist), flist, output_dir, checksum = checksum)
 					continue
 
 				# If arch is specified, build exclusion patterns
@@ -265,7 +268,7 @@ if __name__ == '__main__':
 						continue
 					flist += [[md5, file_size, file_name]]
 				print('Fetching Level 2 indices for', url, dist, pool, '...', flush = True)
-				checked_download('%s/dists/%s/' % (url, dist), flist, output_dir)
+				checked_download('%s/dists/%s/' % (url, dist), flist, output_dir, checksum = index_checksum)
 
 
 				# Secondly, download the distrib's pool index with timestamp awareness
@@ -275,7 +278,7 @@ if __name__ == '__main__':
 					md5_sz_fn_list = parse_Packages(pkg_filename)
 					if md5_sz_fn_list:
 						print('Downloading packages in', pkg_filename, '...', flush = True)
-						checked_download(url, md5_sz_fn_list, output_dir)
+						checked_download(url, md5_sz_fn_list, output_dir, checksum = checksum)
 						url_filelist += [make_path([output_dir, url, c]) for a, b, c in md5_sz_fn_list]
 					else:
 						print('There are 0 packages in', pkg_filename, '=> Skip', flush = True)
