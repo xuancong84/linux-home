@@ -27,7 +27,7 @@ alias c='cat'
 alias p='ps aux | l'
 alias ka='killallbyname'
 alias ac='zcat -f'
-alias killstop='kill $(jobs -p)'
+alias killstop='kill -9 $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
 alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
 alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
