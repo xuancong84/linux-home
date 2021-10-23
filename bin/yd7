@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+
+if [ $# != 2 ]; then
+	echo "Usage: $0 YOUTUBE_URL output.mp4"
+	exit 1
+fi
+
+youtube-dl -F "$1" | grep '^[0-9]' | python3 -c "
+import os,sys
+
+all=sys.stdin.read()
+print(all, file=sys.stderr)
+
+Ls = all.splitlines()
+best = [L.split() for L in Ls if '(best)' in L]
+audios = [L.split() for L in Ls if 'audio only' in L]
+videos = [L.split() for L in Ls if 'video only' in L]
+
+def comp_f(t):
+	val = int(t[3][:-1])
+	return (7200 if val==720 else val, int(t[4][:-1]))
+
+def get_format_str():
+	global best,audios,videos
+	# if '(best)' satisfies requirement, return it right away
+	try:
+		if best and int(best[0][3][:-1])>=720:
+			return str(best[0][0])
+	except:
+		pass
+
+	# determine video
+	try:
+		videos = sorted(videos, key=comp_f, reverse=True)
+		mp4s = [its for its in videos if its[1]=='mp4']
+		if not mp4s: mp4s = videos
+		video = str(mp4s[0][0])
+	except:
+		print('Error: cannot determine video format, choosing the best quality', file=sys.stderr)
+		video = str(videos[-1][0])
+
+	# determine audio
+	m4as = [its for its in audios if its[1]=='m4a']
+	if not m4as: m4as = audios
+	audio = str(m4as[-1][0])
+	
+	return f'{video}+{audio}'
+
+print(get_format_str())
+	
+" >/tmp/$$
+
+fmt=`cat /tmp/$$`
+rm -f /tmp/$$
+
+set -x
+youtube-dl -f "$fmt" -o "$2" "$1"
+
