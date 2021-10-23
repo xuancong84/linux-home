@@ -92,7 +92,7 @@ uppercase() {
 	awk '{print toupper($0)}'
 }
 random_string() {
-    cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1
+    cat /dev/urandom | tr -dc 'a-km-zA-HJ-NP-Z2-9' | fold -w ${1:-32} | head -n 1
 }
 gn() {
     if [ $# == 0 ]; then
