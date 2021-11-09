@@ -1,0 +1,81 @@
+[global_config]
+  suppress_multiple_term_dialog = True
+[keybindings]
+  zoom_in = <Primary>equal
+  new_tab = <Alt>t
+  cycle_next = None
+  cycle_prev = None
+  go_next = None
+  go_prev = None
+  go_up = <Alt><Super>Up
+  go_down = <Alt><Super>Down
+  go_left = <Alt><Super>Left
+  go_right = <Alt><Super>Right
+  rotate_cw = None
+  rotate_ccw = None
+  split_horiz = <Alt><Super>v
+  split_vert = <Alt><Super>h
+  close_term = None
+  copy = <Super>c
+  paste = <Super>v
+  toggle_scrollbar = None
+  page_up = <Shift>Page_Up
+  page_down = <Shift>Page_Down
+  close_window = None
+  resize_up = None
+  resize_down = None
+  resize_left = None
+  resize_right = None
+  move_tab_right = <Primary><Alt>Right
+  move_tab_left = <Primary><Alt>Left
+  toggle_zoom = None
+  next_tab = <Alt>Right
+  prev_tab = <Alt>Left
+  switch_to_tab_1 = <Alt>1
+  switch_to_tab_2 = <Alt>2
+  switch_to_tab_3 = <Alt>3
+  switch_to_tab_4 = <Alt>4
+  switch_to_tab_5 = <Alt>5
+  switch_to_tab_6 = <Alt>6
+  switch_to_tab_7 = <Alt>7
+  switch_to_tab_8 = <Alt>8
+  switch_to_tab_9 = <Alt>9
+  full_screen = None
+  reset_clear = <Alt><Super>BackSpace
+  hide_window = None
+  group_all = None
+  ungroup_all = None
+  group_tab = None
+  ungroup_tab = None
+  new_window = None
+  new_terminator = None
+  broadcast_off = None
+  broadcast_group = None
+  broadcast_all = None
+  insert_number = None
+  insert_padded = None
+  edit_window_title = None
+  edit_tab_title = None
+  edit_terminal_title = None
+  layout_launcher = None
+  help = None
+[profiles]
+  [[default]]
+    cursor_color = "#aaaaaa"
+    font = Monospace 9
+    show_titlebar = False
+    scrollback_lines = 1000000
+    word_chars = "-,./?%&#_~"
+    login_shell = True
+    use_system_font = False
+    copy_on_selection = True
+[layouts]
+  [[default]]
+    [[[window0]]]
+      type = Window
+      size = 900, 600
+      parent = ""
+    [[[child1]]]
+      type = Terminal
+      parent = window0
+[plugins]

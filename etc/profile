@@ -1,0 +1,55 @@
+# /etc/profile: system-wide .profile file for the Bourne shell (sh(1))
+# and Bourne compatible shells (bash(1), ksh(1), ash(1), ...).
+
+if [ "`id -u`" -eq 0 ]; then
+  PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+else
+  PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
+fi
+export PATH
+
+if [ "${PS1-}" ]; then
+  if [ "${BASH-}" ] && [ "$BASH" != "/bin/sh" ]; then
+    # The file bash.bashrc already sets the default PS1.
+    # PS1='\h:\w\$ '
+    if [ -f /etc/bash.bashrc ]; then
+      . /etc/bash.bashrc
+    fi
+  else
+    if [ "`id -u`" -eq 0 ]; then
+      PS1='# '
+    else
+      PS1='$ '
+    fi
+  fi
+fi
+
+if [ -d /etc/profile.d ]; then
+  for i in /etc/profile.d/*.sh; do
+    if [ -r $i ]; then
+      . $i
+    fi
+  done
+  unset i
+fi
+
+alias l='less'
+alias ll='ls -alh'
+alias lr='less -r'
+alias t='top'
+alias c='cat'
+alias p='ps aux | l'
+alias ka='killall.sh'
+alias ac='zcat -f'
+alias killstop='kill $(jobs -p)'
+alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
+alias sul='sudo su -l'
+alias sus='sudo su'
+alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
+
+shopt -s direxpand
+
+export LESSOPEN="| /usr/bin/lesspipe %s";
+export LESSCLOSE="/usr/bin/lesspipe %s %s";
+
+
