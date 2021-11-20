@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Universal XML List Editor (GameList Editor)</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<style>
+		.dragResize {
+			z-index: 9;
+			background-color: #f1f1f1;
+			border: 1px solid #d3d3d3;
+			text-align: center;
+			vertical-align: middle;
+			position: absolute;
+			resize: both;
+			overflow: auto;
+		}
+
+		.dragResize .dragger-top {
+			width: 100%;
+			height: 8px;
+			background-color: #2196f3;
+			opacity: 0.5;
+			position: absolute;
+			top: 0px;
+			cursor: move;
+			z-index: 9999;
+		}
+
+		.dragResize .resizer-right {
+			width: 5px;
+			height: 100%;
+			background: transparent;
+			position: absolute;
+			right: 0;
+			bottom: 0;
+			cursor: e-resize;
+			z-index: 9999;
+		}
+
+		.dragResize .resizer-bottom {
+			width: 100%;
+			height: 5px;
+			background: transparent;
+			position: absolute;
+			right: 0;
+			bottom: 0;
+			cursor: n-resize;
+			z-index: 9999;
+		}
+
+		.dragResize .resizer-both {
+			width: 5px;
+			height: 5px;
+			background: transparent;
+			z-index: 9999;
+			position: absolute;
+			right: 0;
+			bottom: 0;
+			cursor: nw-resize;
+		}
+
+		.dragResize * {
+			-webkit-touch-callout: none; /* iOS Safari */
+			-webkit-user-select: none; /* Safari */
+			-khtml-user-select: none; /* Konqueror HTML */
+			-moz-user-select: none; /* Firefox */
+			-ms-user-select: none; /* Internet Explorer/Edge */
+			user-select: none; /* Non-prefixed version, currently supported by Chrome and Opera */
+		}
+	</style>
+</head>
+
+<body style="width: 100%; height:100%; margin:0.5em">
+	<div id="topPanel">
+		<label for="rootDir">Select ROOT directory:</label> <input type="file" id="rootDir" webkitdirectory />
+		<label for="xmlFileName">XML filename:</label> <input type="text" size=10 id="xmlFileName" value="gamelist.xml" />
+		&nbsp;
+		<label for="listEntry">XML keyword tag:</label> <input type="text" size=10 id="listEntry" value="game" /> &nbsp;
+		<label for="nameTag">XML Name tag:</label> <input type="text" size=10 id="nameTag" value="path" /> &nbsp;
+		<button onclick="load_all()">Load</button> &nbsp;
+		<label id="status_bar">Loading webpage ...</label>
+	</div>
+	<hr id='hr' class="solid" style="border-top: 4px solid; margin: 0.5em;">
+	<div id="outermost">
+		<div id="listPanel" style="width: 30%" class="dragResize">
+			<select id="selector" style="width:100%; height:100%;" onchange="load_one()">
+			</select>
+		</div>
+		<div id="itemPanel"></div>
+	</div>
+</body>
+<script>
+	var status_bar = document.getElementById("status_bar");
+	var selector = document.getElementById("selector");
+	var itemPanel = document.getElementById("itemPanel");
+	var g_filename2file, g_basepath, g_fileList;
+	function find_file_obj(filename) {
+		return g_filename2file[g_basepath+(filename.startsWith("./")?filename.substr(2):filename)];
+	}
+	function mean(grades) {
+		const total = grades.reduce((a, b) => a + b, 0);
+		return total / grades.length;
+	}
+	function process_xml(games) {
+		var key_set = new Set(), image_set = new Set(), video_set = new Set(), value_lens = {}, json_list = [];
+		var everyN = Math.round(games.length/64);
+		for (var game of games) {
+			var json_obj = {};
+			for (var child of game.children) {
+				key_set.add(child.nodeName);
+				if (!(child.nodeName in value_lens)) value_lens[child.nodeName] = [];
+				value_lens[child.nodeName].push(child.textContent.length);
+				json_obj[child.nodeName] = child.textContent;
+				// Find all image and video entries
+				var fp = find_file_obj(child.textContent);
+				if(fp!==undefined){
+					if(fp.type.includes('image')) image_set.add(child.nodeName);
+					if(fp.type.includes('video')) video_set.add(child.nodeName);
+				}
+			}
+			json_list.push(json_obj);
+		}
+		for (var key in value_lens)
+			value_lens[key] = mean(value_lens[key]);
+		return [key_set, value_lens, json_list, image_set, video_set];
+	}
+	function load_one() {
+		var json_obj = json_list[selector.value];
+		for (var key of key_set) {
+			var div = document.getElementById('div_'+key);
+			div.children[0].checked = key in json_obj;
+			div.children[1].innerHTML = key;
+			div.children[2].value = (key in json_obj ? json_obj[key] : '');
+		}
+	}
+
+	// Main function
+	var g_option_height = 0;
+	async function load_all() {
+		status_bar.innerHTML = "Loading ...";
+
+		// Rebuild filename-to-file map 
+		g_fileList = document.getElementById("rootDir").files;
+		g_filename2file = {};
+		for (var file1 of g_fileList) g_filename2file[file1.webkitRelativePath] = file1;
+		g_basepath = g_fileList[0].webkitRelativePath.split('/')[0]+'/';
+
+		// Find and load the main game-list XML
+		var xmlfilename = document.getElementById("xmlFileName").value;
+		var xmlfile = find_file_obj(xmlfilename);
+		if (xmlfile === undefined) {
+			alert("Error: cannot find the XML file (" + xmlfilename + ") in the ROOT folder!");
+			return;
+		}
+		var parser = new DOMParser();
+		var xmlObj = parser.parseFromString(await xmlfile.text(), "text/xml");
+		games = xmlObj.getElementsByTagName(document.getElementById("listEntry").value);
+		var nameTag = document.getElementById("nameTag").value;
+
+		// For each item, create an <option> and add into the <select>
+		selector.innerHTML = '';
+		for (var game of games) {
+			var names = game.getElementsByTagName(nameTag);
+			if (names.length == 0) continue;
+			var option = document.createElement("option");
+			option.text = names[0].textContent;
+			option.value = selector.length;
+			selector.add(option);
+		}
+		if (games.length > 0) {
+			if (g_option_height == 0) g_option_height = (selector.offsetHeight + selector.clientHeight) / 2;
+			var font_size = parseFloat(getComputedStyle(document.getElementById('hr'), null).getPropertyValue('font-size'));
+			selector.size = Math.floor((window.innerHeight - document.getElementById("topPanel").offsetHeight - font_size * 2 - 4) / g_option_height);
+			[key_set, value_lens, json_list, image_set, video_set] = process_xml(games);
+			var max_key = [...key_set].reduce((a, b) => (a.length >= b.length ? a : b));
+			var max_label_size = max_key.length*font_size*9/16;
+			itemPanel.innerHTML = '';
+			for (var key of key_set) {	// create input fields for each property
+				var div = document.createElement('div');
+				var check = document.createElement('input');
+				var label = document.createElement('label');
+				var input = document.createElement('input', { type: "text" });
+				check.type = "checkbox";
+				check.style = "display:inline-block; vertical-align: left; position: relative; left: 0px;";
+				label.style = "display: inline-block; width: " + max_label_size + "px";
+				div.appendChild(check);
+				div.appendChild(label);
+				div.appendChild(input);
+				div.style = "resize:both; display:inline-block";
+				div.id = "div_"+key;
+				div.classList.add("dragResize");
+				itemPanel.appendChild(div);
+			}
+			selector.value = 0;
+			load_one();
+		}
+		initDragElement();
+		initResizeElement();
+		status_bar.innerHTML = games.length + " items loaded!";
+	}
+
+
+
+	// Utility codes for draggable and resizable
+	function initDragElement() {
+		var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+		var popups = document.getElementsByClassName("dragResize");
+		var elmnt = null;
+		var currentZIndex = 100; //TODO reset z index when a threshold is passed
+
+		for (var i = 0; i < popups.length; i++) {
+			var p = popups[i];
+
+			var top = document.createElement("div");
+			top.className = "dragger-top";
+			p.appendChild(top);
+			top.addEventListener("mousedown", dragMouseDown, false);
+			top.parentPopup = p;
+		}
+
+		function dragMouseDown(e) {
+			elmnt = this.parentPopup;
+			elmnt.style.zIndex = "" + ++currentZIndex;
+
+			e = e || window.event;
+			// get the mouse cursor position at startup:
+			pos3 = e.clientX;
+			pos4 = e.clientY;
+			document.onmouseup = closeDragElement;
+			// call a function whenever the cursor moves:
+			document.onmousemove = elementDrag;
+		}
+
+		function elementDrag(e) {
+			if (!elmnt) return;
+
+			e = e || window.event;
+			// calculate the new cursor position:
+			pos1 = pos3 - e.clientX;
+			pos2 = pos4 - e.clientY;
+			pos3 = e.clientX;
+			pos4 = e.clientY;
+			// set the element's new position:
+			elmnt.style.top = elmnt.offsetTop - pos2 + "px";
+			elmnt.style.left = elmnt.offsetLeft - pos1 + "px";
+		}
+
+		function closeDragElement() {
+			/* stop moving when mouse button is released:*/
+			document.onmouseup = null;
+			document.onmousemove = null;
+		}
+	}
+
+	function initResizeElement() {
+		var popups = document.getElementsByClassName("dragResize");
+		var element = null, hori = false, vert = false;
+		var startX, startY, startWidth, startHeight;
+
+		for (var i = 0; i < popups.length; i++) {
+			var p = popups[i];
+
+			var right = document.createElement("div");
+			right.className = "resizer-right";
+			p.appendChild(right);
+			right.addEventListener("mousedown", initDrag, false);
+			right.parentPopup = p;
+
+			var bottom = document.createElement("div");
+			bottom.className = "resizer-bottom";
+			p.appendChild(bottom);
+			bottom.addEventListener("mousedown", initDrag, false);
+			bottom.parentPopup = p;
+
+			var both = document.createElement("div");
+			both.className = "resizer-both";
+			p.appendChild(both);
+			both.addEventListener("mousedown", initDrag, false);
+			both.parentPopup = p;
+		}
+
+		function initDrag(e) {
+			element = this.parentPopup;
+
+			hori = (e.target.className == 'resizer-both' || e.target.className == 'resizer-right');
+			vert = (e.target.className == 'resizer-both' || e.target.className == 'resizer-bottom');
+
+			startX = e.clientX;
+			startY = e.clientY;
+			startWidth = parseInt(document.defaultView.getComputedStyle(element).width, 10);
+			startHeight = parseInt(document.defaultView.getComputedStyle(element).height, 10);
+			document.documentElement.addEventListener("mousemove", doDrag, false);
+			document.documentElement.addEventListener("mouseup", stopDrag, false);
+		}
+
+		function doDrag(e) {
+			if (hori) element.style.width = startWidth + e.clientX - startX + "px";
+			if (vert) element.style.height = startHeight + e.clientY - startY + "px";
+		}
+
+		function stopDrag() {
+			document.documentElement.removeEventListener("mousemove", doDrag, false);
+			document.documentElement.removeEventListener("mouseup", stopDrag, false);
+		}
+	}
+
+	window.onload = () => {
+		//	initDragElement();
+		//  initResizeElement();
+		status_bar.innerHTML = "Ready!";
+	};
+</script>
+
+</html>
