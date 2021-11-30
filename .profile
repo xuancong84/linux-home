@@ -18,6 +18,9 @@ export CPLUS_INCLUDE_PATH=$HOME/include:$CPLUS_INCLUDE_PATH
 export C_INCLUDE_PATH=$HOME/include:$C_INCLUDE_PATH
 export LIBRARY_PATH=$HOME/lib:$LIBRARY_PATH
 
+# install XIM so that you can switch input method over X11 forwarding
+export XMODIFIERS="@im=fcitx"
+
 alias l='less'
 alias ll='ls -alG'
 alias lr='less -r'
