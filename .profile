@@ -18,8 +18,12 @@ export CPLUS_INCLUDE_PATH=$HOME/include:$CPLUS_INCLUDE_PATH
 export C_INCLUDE_PATH=$HOME/include:$C_INCLUDE_PATH
 export LIBRARY_PATH=$HOME/lib:$LIBRARY_PATH
 
-# install XIM so that you can switch input method over X11 forwarding
-export XMODIFIERS="@im=fcitx"
+# install XIM (apt install uim-xim) so that you can switch input method over X11 forwarding
+IM_METHOD=fcitx
+export GTK_IM_MODULE=$IM_METHOD
+export QT_IM_MODULE=$IM_METHOD
+export XMODIFIERS="@im=$IM_METHOD"
+export sshkh="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
 alias l='less'
 alias ll='ls -alG'
