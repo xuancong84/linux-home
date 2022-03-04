@@ -26,7 +26,7 @@ export XMODIFIERS="@im=$IM_METHOD"
 export sshkh="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
 alias l='less'
-alias ll='ls -alG'
+alias ll='ls -alG --color=auto'
 alias lr='less -r'
 alias t='top'
 alias gtop="watch -n 1 \"nvidia-smi | grep '^| \{1,8\}[^ ]'\""
@@ -39,6 +39,14 @@ alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --
 alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
 alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
 alias sul='sudo su -l'
+
+# multi-line sed
+alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
+alias py3="~/anaconda3/bin/python -i -c \"import os,sys,re,math,random;import pandas as pd;import numpy as np;from collections import *\""
+alias apy="~/anaconda3/bin/python"
+alias test_pytorch="~/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
+alias test_tensorflow="~/anaconda3/bin/python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'"
+
 
 adb_broadcast() {
 	if [ $# == 0 ]; then
@@ -126,24 +134,19 @@ create_ssl_x509() {
 	openssl req -x509 -sha256 -nodes -days $days -newkey $enc -keyout $out.key -out $out.crt
 }
 ctop() {
-    watch -n 1 "cat /proc/cpuinfo | grep '^cpu MHz'"
+	watch -n 1 "cat /proc/cpuinfo | grep '^cpu MHz'"
 }
-mdcd(){
+
+mdcd() {
 	mkdir -p "$1" && cd "$1"
 }
+
 set_nvidia() {
 	__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia
 }
 set_intel() {
 	unset __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME
 }
-
-# multi-line sed
-alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
-
-# python 3 test
-alias py3="~/anaconda3/bin/python -i -c \"import os,sys,re,math;import pandas as pd;import numpy as np;from collections import *\""
-alias apy="~/anaconda3/bin/python"
 
 shopt -s direxpand
 

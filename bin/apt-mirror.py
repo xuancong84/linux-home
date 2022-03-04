@@ -1,6 +1,21 @@
 #!/usr/bin/env python3
 # coding=utf-8
 
+# 1. You need insert '[trusted=yes]' into every line in sources.list to avoid GPG error, e.g., turn:
+# deb [arch=amd64,i386] http://deb.debian.org/debian bullseye main contrib non-free
+# into the following:
+# deb [arch=amd64,i386 trusted=yes] http://deb.debian.org/debian bullseye main contrib non-free
+
+# 2. You also need to append the following 4 lines to /etc/apt/apt.conf in order to make offline repo update work
+#APT::Get::AllowUnauthenticated "true";
+#APT::Update::AllowUnauthenticated "true";
+#Acquire::AllowInsecureRepositories "true";
+#APT { Ignore {"gpg-pubkey"; }};
+#Acquire::Check-Valid-Until "0";
+#APT { Get { AllowUnauthenticated "1"; }; };
+
+
+
 import os, sys, argparse, re, gzip, hashlib, requests, fnmatch, signal, lzma, io
 import time
 from glob import glob
@@ -23,6 +38,14 @@ def Open(fn, mode = 'rt', **kwargs):
 	elif fn.lower().endswith('.xz'):
 		return lzma.open(fn, mode, **kwargs)
 	return open(fn, mode, **kwargs)
+
+def try_gunzip(fn):
+	try:
+		with gzip.open(fn, 'rb') as fp:
+			ret = fp.read()
+		return ret
+	except:
+		return b''
 
 def OpenPrefix(fn, mode = 'rt', **kwargs):
 	flist = [afn for afn in [fn, fn+'.gz', fn+'.xz'] if os.path.isfile(afn)]
@@ -88,7 +111,7 @@ def parse_Packages(fn):
 	return ret
 
 def verify_checksum(fullpath, cksum):
-	fdata = open(fullpath, 'rb').read()
+	fdata = fullpath if type(fullpath)==bytes else open(fullpath, 'rb').read()
 	if len(cksum)==32:
 		return cksum == hashlib.md5(fdata).hexdigest()
 	elif len(cksum)==40:
@@ -112,13 +135,17 @@ def unchecked_download(input_url, output_path, filesize=None, chksum=None):
 						f.write(chunk)
 						i += 1
 						print(_progress_spin[i % len(_progress_spin)], end = '\b', flush = True)
-				if filesize is not None and os.path.getsize(output_fullpath) != int(filesize):
+				if filesize is not None and os.path.getsize(output_fullpath) != int(filesize)\
+					and len(try_gunzip(output_fullpath)) != int(filesize):
 					print(f'Downloaded file {output_fullpath} has incorrect size, tried {fail+1} times ...')
-					delete_file(output_fullpath)
+					if fail<2:
+						delete_file(output_fullpath)
 					continue
-				if chksum is not None and not verify_checksum(output_fullpath, chksum):
+				if chksum is not None and not verify_checksum(output_fullpath, chksum)\
+					and not verify_checksum(try_gunzip(output_fullpath), chksum):
 					print(f'Downloaded file {output_fullpath} has incorrect checksum, tried {fail+1} times ...')
-					delete_file(output_fullpath)
+					if fail<2:
+						delete_file(output_fullpath)
 					continue
 				return True
 		except Exception as e:
@@ -186,7 +213,7 @@ if __name__ == '__main__':
 	parser.add_argument('--index-checksum', help = 'verify checksum for existing index files (old), downloaded index files (new), or both (by default);'
                         'even though checksum verification can be disabled, file size verification will always be enabled',
 	                    default = 'both', choices = ['none', 'old', 'new', 'both'])
-	parser.add_argument('--timeout', '-t', help = 'connection timeout (in seconds)', default = 10, type = int)
+	parser.add_argument('--timeout', '-t', help = 'connection timeout (in seconds)', default = 30, type = int)
 	parser.add_argument('--no-wget', '-nw', help = 'do NOT use wget', action = 'store_true')
 	parser.add_argument('--delete-old', '-D', help = 'delete old files in pool that are not in Level 2 index', action = 'store_true')
 	# nargs='?': optional positional argument; action='append': multiple instances of the arg; type=; default=
@@ -209,13 +236,15 @@ if __name__ == '__main__':
 				for option in options[1:-1].split():
 					k, v = option.split('=')
 					if k=='arch' or k=='arch+':
-						opt[k] = v.split(',')
+						opt['arch'] = v.split(',')
 					elif k=='arch-':
-						opt[k] = ['!'+i for i in v.split(',')]
+						opt['arch'] = ['!'+i for i in v.split(',')]
 				L1 = L1.replace(options, '')
 
 			its = L1.split()
 			opt['source'] = its[0].endswith('-src')
+			if 'arch' in opt and 'all' not in opt['arch']:
+				opt['arch'] += ['all']
 			if its[2].endswith('/'):
 				repos[its[1]][its[2]].add('/ '+str(opt))
 			else:
@@ -240,11 +269,11 @@ if __name__ == '__main__':
 			dst_dir = '%s/%s/%s'%(output_dir, url_nohttp, dist) if dist.endswith('/') else '%s/%s/dists/%s/'%(output_dir, url_nohttp, dist)
 			if not no_wget:
 				wget_current_dir(output_dir, src_dir)
-			if not os.path.isfile(f'{dst_dir}Release'):
-				unchecked_download(f'{src_dir}Release', output_dir+'/')
+			unchecked_download(f'{src_dir}Release', output_dir+'/')
+			unchecked_download(f'{src_dir}InRelease', output_dir + '/')
 
-			if not os.path.isfile(f'{dst_dir}Release'):
-				print(f'SKIP: unable to download {dst_dir}Release', flush = True)
+			if not os.path.isfile(f'{dst_dir}Release') and not os.path.isfile(f'{dst_dir}InRelease'):
+				print(f'SKIP: unable to download {dst_dir}Release nor {dst_dir}InRelease', flush = True)
 				continue
 
 			# Parse the Release file
@@ -273,7 +302,7 @@ if __name__ == '__main__':
 				# Fetch level2 indices
 				flist = []
 				for md5, file_size, file_name in level1:
-					if not file_name.startswith(pool+'/') and pool!='/': continue
+					if '/' in file_name and not file_name.startswith(pool+'/') and pool != '/': continue
 					if '/source/' in file_name: continue
 					S = set([(1 if file_name in [patn % arch for arch in option['arch']] else 0) for patn in exclude_patns if fnmatch.fnmatch(file_name, patn % '*')])
 					if S==set([0]): continue
