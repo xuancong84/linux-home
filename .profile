@@ -147,7 +147,12 @@ set_nvidia() {
 set_intel() {
 	unset __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME
 }
-
+norm_vol() {
+	ffmpeg-normalize "$1" -o $$.mp4 -c:a aac -t -10 -f
+	if [ $? == 0 ]; then
+		mv $$.mp4 "$1"
+	fi
+}
 shopt -s direxpand
 
 # `less` can view archives directly (.tar.gz, .zip, etc.)
