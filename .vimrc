@@ -16,6 +16,7 @@ filetype plugin indent on
 set mouse=a
 set tabstop=4
 set shiftwidth=4
+set scrolloff=0
 set autoindent
 set smartindent
 set nowrap

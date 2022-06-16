@@ -6,7 +6,7 @@
 # into the following:
 # deb [arch=amd64,i386 trusted=yes] http://deb.debian.org/debian bullseye main contrib non-free
 
-# 2. You also need to append the following 4 lines to /etc/apt/apt.conf in order to make offline repo update work
+# 2. You also need to append the following lines to /etc/apt/apt.conf in order to make offline repo update work
 #APT::Get::AllowUnauthenticated "true";
 #APT::Update::AllowUnauthenticated "true";
 #Acquire::AllowInsecureRepositories "true";
