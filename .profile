@@ -47,6 +47,17 @@ alias apy="~/anaconda3/bin/python"
 alias test_pytorch="~/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
 alias test_tensorflow="~/anaconda3/bin/python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'"
 
+swapfile() {
+	if [ $# != 2 ]; then
+		echo "Usage: $0 file1 file2"
+		echo "Swap the content of file1 and file2"
+		return 1
+	fi
+	tmp="`dirname \"$1\"`/$$"
+	mv "$1" "$tmp"
+	mv "$2" "$1"
+	mv "$tmp" "$2"
+}
 
 adb_broadcast() {
 	if [ $# == 0 ]; then
