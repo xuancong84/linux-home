@@ -2,32 +2,43 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>婚纱照</title>
+  <title>婚礼照</title>
   <script src="jquery.min.js"></script>
 </head>
 
-<h1 style="text-align: center">婚纱照</h1>
+<h1 style="text-align: center">婚礼照</h1>
 
 <body>
   <table id="table0"></table>
 </body>
 
 <script>
-var low = 'low/';
-var high = 'high/';
+var low = 'all-photos.2s1/';
+var high = 'all-photos.2b/';
+var num_per_row_portrait = 4;
+var num_per_row_landscape = 8;
+
 window.onload = function (){
   $.get(low).done(function(html){
-    var lst = $(html).find('a');
-    var tbl = $('#table0')[0];
-    var row, cell, idx=0;
-    for(var x=0; x<lst.length; x++){
-      var fn = lst[x].innerHTML;
-      if(fn.startsWith('..')) continue;
-      if(idx%4 == 0)row = tbl.insertRow(-1);
-      cell = row.insertCell(-1);
-      cell.innerHTML = '<a href="'+high+fn+'"><img src="'+low+fn+'" style="width:24vw"></a>';
-      idx++;
-    }
+	var num_per_row = 4;
+	var icon_width = "width:24vw";
+	try{
+		if(screen.orientation.type.startsWith('landscape')){
+			num_per_row = 8;
+			icon_width = "width:12vw";
+		}
+	}catch(err){}
+	var lst = $(html).find('a');
+	var tbl = $('#table0')[0];
+	var row, cell, idx=0;
+	for(var x=0; x<lst.length; x++){
+	  var fn = lst[x].innerHTML;
+	  if(fn.startsWith('..')) continue;
+	  if(idx%num_per_row == 0)row = tbl.insertRow(-1);
+	  cell = row.insertCell(-1);
+	  cell.innerHTML = '<a href="'+high+fn+'"><img src="'+low+fn+'" style="'+icon_width+'"></a>';
+	  idx++;
+}
   });
 }
 </script>
