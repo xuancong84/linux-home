@@ -44,8 +44,57 @@ alias sul='sudo su -l'
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
 alias py3="~/anaconda3/bin/python -i -c \"import os,sys,re,math,random;import pandas as pd;import numpy as np;from collections import *\""
 alias apy="~/anaconda3/bin/python"
+
 alias test_pytorch="~/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
 alias test_tensorflow="~/anaconda3/bin/python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'"
+test_nvcc() {
+cat >/tmp/$$.cu <<EOF
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
+
+#define N 50000000
+#define MAX_ERR 1e-6
+
+__global__ void vector_add(float *out, float *a, float *b, int n) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < n) out[tid] = a[tid] + b[tid];
+}
+
+int main(){
+    float *a, *b, *out, *d_a, *d_b, *d_out;
+	printf("Preparing data buffer of size %d in CPU memory ...", N); fflush(stdin);
+    a   = (float*)malloc(sizeof(float) * N);
+    b   = (float*)malloc(sizeof(float) * N);
+    out = (float*)malloc(sizeof(float) * N);
+    for(int i = 0; i < N; i++){
+        a[i] = 1.0f;
+        b[i] = 2.0f;
+    }
+	printf("\nCopying data CPU memory to GPU memory ..."); fflush(stdin);
+    cudaMalloc((void**)&d_a, sizeof(float) * N);
+    cudaMalloc((void**)&d_b, sizeof(float) * N);
+    cudaMalloc((void**)&d_out, sizeof(float) * N);
+    cudaMemcpy(d_a, a, sizeof(float) * N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
+	printf("\nCalculating addition on GPU ..."); fflush(stdin);
+    vector_add<<<(N+256)/256,256>>>(d_out, d_a, d_b, N);
+	printf("\nCopying data back from GPU memory to CPU memory ..."); fflush(stdin);
+    cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
+	printf("\nValidating results ..."); fflush(stdin);
+    for(int i = 0; i < N; i++)
+        assert(fabs(out[i] - a[i] - b[i]) < MAX_ERR);
+    printf("\033[1;92mPASSED\033[0m\n"); fflush(stdin);
+    cudaFree(d_a); cudaFree(d_b); cudaFree(d_out);
+    free(a); free(b); free(out);
+}
+EOF
+	nvcc -o /tmp/$$.out /tmp/$$.cu && nvprof /tmp/$$.out
+	rm -rf /tmp/$$.*
+}
 
 swapfile() {
 	if [ $# != 2 ]; then

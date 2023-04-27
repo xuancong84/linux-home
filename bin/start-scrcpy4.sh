@@ -1,4 +1,6 @@
 
+opt="-t"
+
 session_name=scrcpy
 curr_workspace="`wmctrl -d | grep '*' | awk '{print $1}'`"
 win_IDs=(`wmctrl -lpx | awk "{if(\\$2==$curr_workspace)print \\$1}"`)
@@ -7,7 +9,7 @@ desktop_height=`wmctrl -d | grep '*' | awk '{print $9}' | sed "s:.*x::g"`
 devs=(`adb devices | sed '/^$/d' | awk '{if(NR>1)print $1}'`)
 cmds=("watch -n 1 adb devices")
 for dev in ${devs[@]}; do
-	cmds[${#cmds[@]}]="scrcpy -s $dev"
+	cmds[${#cmds[@]}]="scrcpy $opt -s $dev"
 done
 
 if [ "`tmux ls | grep $session_name`" ]; then
