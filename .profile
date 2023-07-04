@@ -96,6 +96,19 @@ EOF
 	rm -rf /tmp/$$.*
 }
 
+mp4_shrink() {
+	if [ $# == 0 ]; then
+		echo "Usage: $0 input.mp4 output.mp4 [crf=30]"
+		echo "ffmpeg -i input.mp4 -vcodec libx265 -crf 30 output.mp4"
+		exit
+	fi
+	crf=30
+	if [ $# -ge 3 ]; then
+		crf=$3
+	fi
+	ffmpeg -i "$1" -vcodec libx265 -crf $crf "$2"
+}
+
 swapfile() {
 	if [ $# != 2 ]; then
 		echo "Usage: $0 file1 file2"
