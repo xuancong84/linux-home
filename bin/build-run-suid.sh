@@ -8,6 +8,7 @@ if [ "$1" == '-h' ] || [ "$1" == "--help" ] || [ "`whoami`" != root ] ;then
 fi
 
 build() {
+	echo "$@" >&2
 	cat >$1.cpp <<EOF
 #include <stdlib.h>
 #include <stdio.h>
@@ -26,7 +27,7 @@ if [ $# -ge 2 ]; then
 	build "$@"
 else
 	while read line; do
-		build $line
+		[ "$line" ] && [[ ! $line =~ ^#.* ]] && build $line
 	done
 fi
 
