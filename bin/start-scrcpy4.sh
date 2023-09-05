@@ -32,16 +32,9 @@ done
 
 sleep 1
 set -x
-for winID in ${win_IDs[*]}; do
-	wmctrl -i -r $winID -b remove,maximized_vert,maximized_horz
-	sleep 0.2
-	wmctrl -i -r $winID -e 0,0,0,$[desktop_width-251-240],$desktop_height
-	sleep 0.2
-	wmctrl -i -r $winID -b add,maximized_vert
-	sleep 0.2
-done
 
 names=()
+newIDs=()
 while IFS= read -r line; do
 	wsID=`echo "$line" | awk '{print $2}'`
 	if [ "$wsID" != "$curr_workspace" ]; then
@@ -49,26 +42,42 @@ while IFS= read -r line; do
 	fi
 	winID=`echo "$line" | awk '{print $1}'`
 	if ! [[ "${win_IDs[*]}" == *"$winID"* ]]; then
+		newIDs[${#names[@]}]="$winID"
 		names[${#names[@]}]="`echo $line | awk '{ print substr($0, index($0,$4)) }'`"
 	fi
 done <<<"`wmctrl -l`"
 
+
 N=${#names[@]}
+cx=$desktop_width
+cy=0
 if [ $N == 1 ]; then
 	wmctrl -r "${names[0]}" -e 0,1430,56,490,963
-elif [ $N == 2 ]; then
-	wmctrl -r "${names[0]}" -e 0,1546,0,270,482
-	wmctrl -r "${names[1]}" -e 0,1546,482,270,529
-elif [ $N == 3 ]; then
-	wmctrl -r "${names[0]}" -e 0,1546,0,270,482
-	wmctrl -r "${names[1]}" -e 0,1429,482,251,529
-	wmctrl -r "${names[2]}" -e 0,1680,482,240,529
-elif [ $N == 4 ]; then
-	wmctrl -r "${names[0]}" -e 0,1429,0,251,482
-	wmctrl -r "${names[1]}" -e 0,1429,482,251,529
-	wmctrl -r "${names[2]}" -e 0,1680,482,240,529
-	wmctrl -r "${names[3]}" -e 0,1680,0,240,482
+else
+	w_height=$[desktop_height/2]
+	w_width=$[w_height*9/20]
+	for i in `seq 0 $[N-1]`; do
+		if [ $[i%2] == 0 ]; then
+			cx=$[cx-w_width]
+			cy=0
+		else
+			cy=$[cy+w_height]
+		fi
+		#wmctrl -r "${names[i]}" -e 0,$cx,$cy,$w_width,$w_height
+		xdotool windowsize "${newIDs[i]}" $w_width $w_height
+		xdotool windowmove "${newIDs[i]}" $cx $cy
+	done
 fi
+
+for winID in ${win_IDs[*]}; do
+	wmctrl -i -r $winID -b remove,maximized_vert,maximized_horz
+	sleep 0.2
+	wmctrl -i -r $winID -e 0,0,0,$cx,$desktop_height
+	sleep 0.2
+	wmctrl -i -r $winID -b add,maximized_vert
+	sleep 0.2
+done
+
 
 tmux a -t $session_name
 
