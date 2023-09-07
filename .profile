@@ -182,6 +182,17 @@ uppercase() {
 random_string() {
     cat /dev/urandom | tr -dc 'a-km-zA-HJ-NP-Z2-9' | fold -w ${1:-32} | head -n 1
 }
+m4a_concat() {
+	if [ $# -lt 3 ]; then
+		echo "Usage: $0 file1.m4a file2.m4a combined-out.m4a" >&2
+		return 1
+	fi
+	ffmpeg -i "$1" -acodec copy "$3.1.aac"
+	ffmpeg -i "$2" -acodec copy "$3.2.aac"
+	cat "$3.1.aac" "$3.2.aac" >"$3.aac"
+	ffmpeg -i "$3.aac" -acodec copy -bsf:a aac_adtstoasc "$3"
+	rm -f "$3".*
+}
 gn() {
     if [ $# == 0 ]; then
         echo "Usage: gnumeric [input.csv/input.csv.gz]" >&2
