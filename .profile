@@ -39,6 +39,9 @@ alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --
 alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
 alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
 alias sul='sudo su -l'
+alias open=xdg-open
+alias yd='~/anaconda3/bin/yt-dlp --embed-subs -R infinite --socket-timeout 3 --cookies-from-browser firefox:/home/xuancong/.mozilla/firefox/'
+alias ta='tmux a'
 
 # multi-line sed
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"

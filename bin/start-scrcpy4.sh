@@ -53,6 +53,7 @@ cx=$desktop_width
 cy=0
 if [ $N == 1 ]; then
 	wmctrl -r "${names[0]}" -e 0,1430,56,490,963
+	cx=1430
 else
 	w_height=$[desktop_height/2]
 	w_width=$[w_height*9/20]
@@ -71,11 +72,11 @@ fi
 
 for winID in ${win_IDs[*]}; do
 	wmctrl -i -r $winID -b remove,maximized_vert,maximized_horz
-	sleep 0.2
+	sleep 1
 	wmctrl -i -r $winID -e 0,0,0,$cx,$desktop_height
-	sleep 0.2
+	sleep 1
 	wmctrl -i -r $winID -b add,maximized_vert
-	sleep 0.2
+	sleep 1
 done
 
 
