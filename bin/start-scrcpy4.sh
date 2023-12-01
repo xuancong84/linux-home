@@ -20,32 +20,33 @@ fi
 tmux new-session -s $session_name -d -x 240 -y 60
 
 for i in `seq 0 $[${#cmds[*]}-1]`; do
-	sleep 0.2
-	tmux split-window
-	sleep 0.2
-	tmux select-layout tile
-	sleep 0.2
-	tmux send-keys -l "${cmds[i]}"
-	sleep 0.2
-	tmux send-keys Enter
+	tmux split-window -t $session_name
+	tmux select-layout -t $session_name tile
+	tmux send-keys -t $session_name -l "${cmds[i]}"
+	tmux send-keys -t $session_name Enter
 done
 
-sleep 1
 set -x
 
-names=()
-newIDs=()
-while IFS= read -r line; do
-	wsID=`echo "$line" | awk '{print $2}'`
-	if [ "$wsID" != "$curr_workspace" ]; then
-		continue
+while [ 1 ]; do
+	names=()
+	newIDs=()
+	while IFS= read -r line; do
+		wsID=`echo "$line" | awk '{print $2}'`
+		if [ "$wsID" != "$curr_workspace" ]; then
+			continue
+		fi
+		winID=`echo "$line" | awk '{print $1}'`
+		if ! [[ "${win_IDs[*]}" == *"$winID"* ]]; then
+			newIDs[${#names[@]}]="$winID"
+			names[${#names[@]}]="`echo $line | awk '{ print substr($0, index($0,$4)) }'`"
+		fi
+	done <<<"`wmctrl -l`"
+	if [ ${#newIDs[@]} == ${#devs[@]} ]; then
+		break
 	fi
-	winID=`echo "$line" | awk '{print $1}'`
-	if ! [[ "${win_IDs[*]}" == *"$winID"* ]]; then
-		newIDs[${#names[@]}]="$winID"
-		names[${#names[@]}]="`echo $line | awk '{ print substr($0, index($0,$4)) }'`"
-	fi
-done <<<"`wmctrl -l`"
+	sleep 1
+done
 
 
 N=${#names[@]}
@@ -72,11 +73,8 @@ fi
 
 for winID in ${win_IDs[*]}; do
 	wmctrl -i -r $winID -b remove,maximized_vert,maximized_horz
-	sleep 1
 	wmctrl -i -r $winID -e 0,0,0,$cx,$desktop_height
-	sleep 1
 	wmctrl -i -r $winID -b add,maximized_vert
-	sleep 1
 done
 
 
