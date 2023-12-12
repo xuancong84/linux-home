@@ -15,11 +15,12 @@ def entropy(c: Counter):
 	return sum([-(v/N)*math.log(v/N) for k,v in c.items()])
 
 if __name__=='__main__':
-	parser = argparse.ArgumentParser(usage='$0 arg1 1>output 2>progress', description='what this program does',
+	parser = argparse.ArgumentParser(usage='$0 [options] [files ...]', description='compute statistics on input data',
 			formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	parser.add_argument('files', help='input filenames, if empty, take input from STDIN', nargs='*')
 	parser.add_argument('-s', '--skip-header', help='skip CSV header (the 1st line)', action='store_true')
 	parser.add_argument('-n', '--n-most-common', default=5, type=int, help='N most common')
+	parser.add_argument('-nc', '--no-counts', help='no counts in n-most-common', action='store_true')
 	#nargs='?': optional positional argument; action='append': multiple instances of the arg; type=; default=
 	opt=parser.parse_args()
 	globals().update(vars(opt))
@@ -29,23 +30,26 @@ if __name__=='__main__':
 	else:
 		INPUT = sys.stdin
 
+	name=None
 	arr=[]
 	for L in INPUT:
 		for w in L.split():
 			try:
 				arr+=[float(w)]
 			except:
-				pass
+				name=w if name==None else name
 
 	cnter = Counter(arr)
 
+	if name!=None:
+		print('name=', name)
 	print('max=', max(arr))
 	print('min=', min(arr))
 	print('mean=', mean(arr))
 	print('median=', median(arr))
 	print('std=', std(arr))
 	if n_most_common:
-		print(f'top_{n_most_common}=', cnter.most_common(n_most_common))
+		print(f'top_{n_most_common}=', [i for i,j in cnter.most_common(n_most_common)] if no_counts else cnter.most_common(n_most_common))
 	print('entropy=', entropy(cnter))
 	print('n_diff=', len(cnter))
 	print('n_total=', len(arr))

@@ -17,6 +17,7 @@ if __name__=='__main__':
 	parser.add_argument('-c', '--counts', help='count # of different values', action='store_true')
 	parser.add_argument('-n', '--normalized', help='normalized counts', action='store_true')
 	parser.add_argument('-tr', '--table-row', help='output table row of [name,#-diff-values,entropy,top4-names]', action='store_true')
+	parser.add_argument('-t', '--table', help='output in table format', action='store_true')
 	#nargs='?': optional positional argument; action='append': multiple instances of the arg; type=; default=
 	opt=parser.parse_args()
 	globals().update(vars(opt))
@@ -37,7 +38,7 @@ if __name__=='__main__':
 		print(f'{key}\t{len(cnter2)}\t%.3f\t{[k[0] for k in cnter2[0:4]]}'%E)
 		sys.exit(0)
 
-	print(cnter)
+	print('\n'.join([f'{p[0]}\t{p[1]}' for p in cnter]) if table else cnter)
 
 	if normalized:
 		N=sum(cnter1.values())
