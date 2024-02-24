@@ -42,6 +42,10 @@ alias sul='sudo su -l'
 alias open=xdg-open
 alias yd='~/anaconda3/bin/yt-dlp --embed-subs -R infinite --socket-timeout 3 --cookies-from-browser firefox:/home/xuancong/.mozilla/firefox/'
 alias ta='tmux a'
+alias xp_start='xpra start :100  --start-child=xterm --start-via-proxy=no --opengl=yes'
+alias xp_list='xpra list'
+alias xp_stop='xpra stop :100'
+alias xp_attach='xpra attach :100'
 
 # multi-line sed
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
@@ -235,11 +239,23 @@ set_intel() {
 	unset __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME
 }
 norm_vol() {
-	ffmpeg-normalize "$1" -o $$.mp4 -c:a aac -t -12 -nt rms -f
-	if [ $? == 0 ]; then
+	if [ $# == 0 ];then
+		echo "Usage: norm_vol file.mp4 level=-20 output.mp4"
+		return
+	fi
+	lvl="$2"
+	if [ ! "$lvl" ]; then
+		lvl="-20"
+	fi
+	out="$3"
+	ffmpeg-normalize "$1" -o $$.mp4 -c:a aac -t $lvl -nt rms -f
+	if [ "$out" ]; then
+		mv $$.mp4 "$out"
+	else
 		mv $$.mp4 "$1"
 	fi
 }
+
 shopt -s direxpand
 
 # `less` can view archives directly (.tar.gz, .zip, etc.)

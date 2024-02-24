@@ -9,7 +9,7 @@ set output-meta on
 "\ej": backward-word
 "\M-k": forward-word
 "\M-j": backward-word
-
+"\C-h": unix-line-discard
 
 
 # To allow the use of 8bit-characters like the german umlauts, uncomment
