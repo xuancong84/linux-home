@@ -41,6 +41,7 @@ alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
 alias sul='sudo su -l'
 alias open=xdg-open
 alias yd='~/anaconda3/bin/yt-dlp --embed-subs -R infinite --socket-timeout 3 --cookies-from-browser firefox:/home/xuancong/.mozilla/firefox/'
+alias ydvr='~/anaconda3/bin/yt-dlp -R infinite --socket-timeout 3 --user-agent "" --extractor-args "youtube:player-client=web"'
 alias ta='tmux a'
 alias xp_start='xpra start :100  --start-child=xterm --start-via-proxy=no --opengl=yes'
 alias xp_list='xpra list'
