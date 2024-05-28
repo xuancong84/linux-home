@@ -38,7 +38,7 @@ alias killstop='kill -9 $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
 alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
 alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
-alias sul='sudo su -l'
+alias sul='sudo -i'
 alias open=xdg-open
 alias yd='~/anaconda3/bin/yt-dlp --embed-subs -R infinite --socket-timeout 3 --cookies-from-browser firefox:/home/xuancong/.mozilla/firefox/'
 alias ydvr='~/anaconda3/bin/yt-dlp -R infinite --socket-timeout 3 --user-agent "" --extractor-args "youtube:player-client=web"'
@@ -100,7 +100,7 @@ int main(){
     free(a); free(b); free(out);
 }
 EOF
-	nvcc -o /tmp/$$.out /tmp/$$.cu && nvprof /tmp/$$.out
+	nvcc -o /tmp/$$.out /tmp/$$.cu && nvprof /tmp/$$.out || /tmp/$$.out
 	rm -rf /tmp/$$.*
 }
 
