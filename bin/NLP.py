@@ -14,7 +14,7 @@ expand_path = lambda t: os.path.expandvars(os.path.expanduser(t))
 
 def Open(fn, mode='r', **kwargs):
 	if fn == '-':
-		return sys.stdin if mode.startswith('r') else sys.stdout
+		return open(sys.stdin.fileno(), mode) if mode.startswith('r') else sys.stdout
 	fn = expand_path(fn)
 	return gzip.open(fn, mode, **kwargs) if fn.lower().endswith('.gz') else open(fn, mode, **kwargs)
 
@@ -28,7 +28,8 @@ def load_linegroups(obj):
 		return [lg.split('\n') for lg in obj.read().split('\n\n')]
 
 def save_linegroups(fnfp, obj):
-	fp = Open(fnfp,'wt') if type(fnfp)==str else fnfp
-	fp.write('\n'.join(['\n'.join(lg) for lg in obj]))
-	fp.close()
+	fp = Open(fnfp,'wb') if type(fnfp)==str else fnfp
+	fp.write('\n\n'.join(['\n'.join(lg) for lg in obj])+'\n\n')
+	fp.close() if fp!=fnfp else None
+
 

@@ -5,7 +5,8 @@ if [ $# == 0 ]; then
 	exit 0
 fi
 
-N=100
+N=200
+FS_MAX=100000
 if [[ "$1" =~ ^-[0-9]+$ ]]; then
 	N=${1:1}
 	shift
@@ -13,11 +14,15 @@ fi
 
 files=()
 for f in "$@"; do
-	sn=`basename "$f" | sed "s:[^a-zA-Z0-9,-]:_:g"`
-	tmp=/tmp/$sn.$RANDOM.csv
-	zcat -f "$f" | head -$N >$tmp
+	if [ `stat -c %s "$f"` -ge $FS_MAX ]; then
+		sn=`basename "$f" | sed "s:[^a-zA-Z0-9,-]:_:g"`
+		tmp=/tmp/$sn.$RANDOM.csv
+		zcat -f "$f" | head -N >$tmp
+		files+="$tmp"
+	else
+		tmp="$f"
+	fi
 	gnumeric $tmp &
-	files+="$tmp"
 done
 sleep $#
 rm -rf $files
