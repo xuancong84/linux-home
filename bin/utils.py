@@ -4,9 +4,20 @@ import numpy as np
 from dateutil.tz import tzlocal
 from numpy import isnan
 
+def Try(L, alt=None):
+	try:
+		return L()
+	except:
+		return alt() if callable(alt) else alt
+
 nan = np.nan
 log1p = lambda t: np.log1p(t.astype(float) if hasattr(t, 'astype') else t)
 nan_sum = lambda df : df.sum() if len(df.index) else nan
+expand_path = lambda t: os.path.expandvars(os.path.expanduser(t))
+isdir = lambda t: os.path.isdir(expand_path(t))
+listdir = lambda t: sorted(Try(lambda: os.listdir(expand_path(t)), []))
+ls_subdir = lambda fullpath: [g.rstrip('/') for f in listdir(fullpath)\
+			for g in [expand_path(f'{fullpath}/{f}').replace('//', '/')] if not f.startswith('.') and isdir(g)]
 
 ## This set the timezone to local, which is incorrect coz Unix timestamp is always defined to be at UTC-0
 # def ms_epoch_to_ts(ms_epoch_ts):
@@ -68,13 +79,6 @@ def quantile(obj, Q):
 		return obj.quantile(Q)
 	except:
 		return []
-
-
-def Try(L, alt=None):
-	try:
-		return L()
-	except:
-		return alt() if callable(alt) else alt
 
 
 def apply_frame_from_groupby(df, dfg, col_name, func_names):
@@ -140,7 +144,7 @@ def makedirs(path):
 def Open(fn, mode='r', **kwargs):
 	if fn == '-':
 		return open(sys.stdin.fileno() if mode.startswith('r') else sys.stdout.fileno(), mode)
-	fn = os.path.expanduser(fn)
+	fn = expand_path(fn)
 	return gzip.open(fn, mode, **kwargs) if fn.lower().endswith('.gz') else open(fn, mode, **kwargs)
 
 
@@ -194,12 +198,12 @@ def resolve_zero_vs_nan(df, meta, edge_overflow=0, freq='D', cut_off='auto'):
 
 
 def save(obj, out_filename):
-	with gzip.open(os.path.expanduser(out_filename), 'wb') as fp_out:
+	with gzip.open(expand_path(out_filename), 'wb') as fp_out:
 		pickle.dump(obj, fp_out)
 
 
 def load(in_filename):
-	with gzip.open(os.path.expanduser(in_filename), 'rb') as fp_in:
+	with gzip.open(expand_path(in_filename), 'rb') as fp_in:
 		obj = pickle.load(fp_in)
 	return obj
 
@@ -215,7 +219,7 @@ def check_insuff(arr, conds):
 	return True if arr.size<max([max(a) for a in conds]) else ret
 
 
-def partial_pooling_mean(ser: pd.Series):
+def partial_pooling_mean(ser: pd.Series or pd.DataFrame):
 	# according to Pg11-12 of https://myweb.uiowa.edu/pbreheny/uk/teaching/701/notes/4-18.pdf
 	ser7 = ser.groupby(ser.index.dayofweek)
 	assert len(ser7) == 7	# each dayofweek must occur at least once
@@ -225,8 +229,7 @@ def partial_pooling_mean(ser: pd.Series):
 	w_j = Try(lambda: (var7*ser7.count()/(var7*ser7.count()+var_all)).fillna(0.5), 0.5)
 	return mean_j*w_j + mean_all*(1-w_j)
 
-pd.Series.pp_mean = partial_pooling_mean
-
+pd.Series.pp_mean = pd.DataFrame.pp_mean = partial_pooling_mean
 
 class TC:
 	HEADER = '\033[95m'

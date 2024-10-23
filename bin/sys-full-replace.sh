@@ -125,7 +125,7 @@ cp /etc/fstab /etc/exports /etc/hostname /full-upgrade/etc/
 
 # Perform OS replacement
 cd /full-upgrade
-for f in *; do /busybox mv -v "/$f" /full-backup/; /busybox mv -v "$f" /;done
+for f in *; do if [ -e "/$f" ]; then /busybox mv -v "/$f" /full-backup/; fi; /busybox mv -v "$f" /;done
 cd /
 
 # Prepare EFI

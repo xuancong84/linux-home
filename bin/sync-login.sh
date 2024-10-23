@@ -22,7 +22,7 @@ if not pwu1:
 	sys.exit(1)
 if set(pwu1)!=set(pwu2):
 	Ls=[L for L in pw2 if not is_id_human(L.split(':'))]+pwu1
-	with open(dst+'/passwd', 'wb') as fp:
+	with open(dst+'/passwd', 'wt') as fp:
 		fp.write(''.join(Ls))
 u1=[L.split(':')[0] for L in pwu1]
 u2=[L.split(':')[0] for L in pwu2]
@@ -30,15 +30,15 @@ sdu1=[L for L in sd1 if ':' in L and L.split(':')[0] in u1]
 sdu2=[L for L in sd2 if ':' in L and L.split(':')[0] in u2]
 if set(sdu1)!=set(sdu2):
 	Ls=[L for L in sd2 if not (':' in L and L.split(':')[0] in u2)]+sdu1
-	with open(dst+'/shadow', 'wb') as fp:
+	with open(dst+'/shadow', 'wt') as fp:
 		fp.write(''.join(Ls))
 gpu1=[L for L in gp1 if is_id_human(L.split(':'))]
 gpu2=[L for L in gp2 if is_id_human(L.split(':'))]
 if set(gpu1)!=set(gpu2):
 	Ls=[L for L in gp2 if not is_id_human(L.split(':'))]+gpu1
-	with open(dst+'/group', 'wb') as fp:
+	with open(dst+'/group', 'wt') as fp:
 		fp.write(''.join(Ls))
 "
 
-python -c "$pycode" "$1" "$2"
+python3 -c "$pycode" "$1" "$2"
 
