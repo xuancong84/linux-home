@@ -106,6 +106,14 @@ EOF
 	rm -rf /tmp/$$.*
 }
 
+mkv2mp4() {
+	if [ $# == 0 ]; then
+		echo "Usage: $0 input.mkv" >&2
+		return
+	fi
+	ffmpeg -y -i "$1" -map 0 -c copy "`echo $1 | sed 's:\.mkv$:.mp4:gi'`"
+}
+
 mp4_shrink() {
 	if [ $# == 0 ]; then
 		echo "Usage: $0 input.mp4 output.mp4 [crf=30]"
