@@ -5,7 +5,7 @@ if [ `whoami` != "root" ]; then
 	exit 0
 fi
 
-dirs=(/bin /boot /etc /lib /lib32 /lib64 /libx32 /opt /root /sbin /usr /var)
+dirs=(bin boot etc lib lib32 lib64 libx32 opt root sbin usr var)
 
 pycode="
 import os, sys, argparse
@@ -80,7 +80,7 @@ if __name__=='__main__':
 
 copy_if () {
 	if [ -e "$1" ]; then
-		cp -rf "$1" "$2"
+		rsync -avlP --delete "$1" "$2"
 	fi
 }
 
@@ -109,26 +109,23 @@ if ! file /busybox | grep 'statically'; then
 	exit 1
 fi
 
-# Copy over credentials and configs
+echo Copy over credentials and configs
 python3 -c "$pycode" /etc /full-upgrade/etc
 
 copy_if /etc/network/interfaces /full-upgrade/etc/network/
 copy_if /etc/NetworkManager /full-upgrade/etc/
-
-rm -rf /full-upgrade/etc/openvpn
 copy_if /etc/openvpn /full-upgrade/etc/
-
-rm -rf /full-upgrade/root/.ssh
 copy_if /root/.ssh /full-upgrade/root/
+copy_if /var/log /full-upgrade/var/
 
-cp /etc/fstab /etc/exports /etc/hostname /full-upgrade/etc/
+cp -rf /etc/fstab /etc/exports /etc/host* /etc/sudoers /full-upgrade/etc/
 
-# Perform OS replacement
+echo Perform OS replacement
 cd /full-upgrade
-for f in *; do if [ -e "/$f" ]; then /busybox mv -v "/$f" /full-backup/; fi; /busybox mv -v "$f" /;done
+for f in "${dirs[@]}"; do if [ -e "/$f" ]; then /busybox mv -v "/$f" /full-backup/; fi; /busybox mv -v "$f" /;done
 cd /
 
-# Prepare EFI
+echo Prepare EFI
 EFI=`mount | grep '/boot/efi' | awk '{print $1}'`
 umount /full-backup/boot/efi
 mount $EFI /boot/efi
@@ -136,13 +133,13 @@ rm -rf /full-backup/boot/efi/EFI/*
 mkdir -p /full-backup/boot/efi/EFI
 mv /boot/efi/EFI/* /full-backup/boot/efi/EFI/
 
-# Install grub
+echo Install grub
 grub-mkdevicemap
 ROOT_DEV=`mount | grep ' / ' | awk '{print $1}'`
 grub-install --efi-directory=/boot/efi --root-directory=/ $ROOT_DEV
 update-grub
 update-initramfs -u -k all
 
-# Cleanup
+echo Cleanup
 rm /busybox
 
