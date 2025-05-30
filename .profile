@@ -39,11 +39,12 @@ alias ac='zcat -f'
 alias killstop='kill -9 $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
 alias wan_ip='dig +short myip.opendns.com @resolver1.opendns.com'
+alias showmyip='curl https://ipinfo.io/ip'
 alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
 alias sul='sudo -i'
 alias open=xdg-open
 alias yd='~/anaconda3/bin/yt-dlp --embed-subs -R infinite --socket-timeout 3 --cookies-from-browser firefox:/home/xuancong/.mozilla/firefox/'
-alias ydvr='~/anaconda3/bin/yt-dlp -R infinite --socket-timeout 3 --user-agent "" --extractor-args "youtube:player-client=web"'
+alias ydvr='~/anaconda3/bin/yt-dlp -R infinite --socket-timeout 3 --extractor-args "youtube:player-client=android_vr"'
 alias ta='tmux a'
 alias xp_start='xpra start :100  --start-child=xterm --start-via-proxy=no --opengl=yes'
 alias xp_list='xpra list'
