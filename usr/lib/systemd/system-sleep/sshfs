@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Put this file in /usr/lib/systemd/system-sleep/sshfs for it to take effect
+
+send_sig() {
+	P="`ps aux`"
+	echo "$P" | awk '{if($11~"/code" || $0~"vscode" || $11~"git")print $2}' | while read pid; do
+		kill -s $1 $pid
+	done
+
+	if [ $1 == CONT ]; then
+		return
+	fi
+
+	remote_fs="nfs nfs4 cifs sshfs fuseblk"
+	while [ 1 ]; do
+		pids=
+		for pid_dir in /proc/[0-9]*; do
+		  pid=${pid_dir##*/}
+		
+		  # resolve the exe; skip if unreadable (e.g. kernel threads or permission)
+		  exe=$(readlink -f "$pid_dir/exe" 2>/dev/null) || continue
+		
+		  # get the FS type for the file containing the binary
+		  fstype=$(stat -f -c %T "$exe" 2>/dev/null) || continue
+		
+		  # check if it matches any of our remote‐fs types
+		  for t in $remote_fs; do
+		  	if [[ $fstype == $t* ]]; then
+			  echo $fstype $pid $exe
+			  pids="$pids $pid"
+		      break
+		    fi
+		  done
+		done
+		if [ "$pids" ]; then
+			kill -9 $pids
+		else
+			break
+		fi
+	done
+}
+
+
+case "$1" in
+  pre)
+	# Before suspend or hibernate
+	sync
+	send_sig STOP
+    ;;
+  post)
+    # After resume or thaw
+	send_sig CONT
+	#kill -s CONT `ps aux | awk '{if($11~"sshfs")print $2}'`
+    ;;
+esac
