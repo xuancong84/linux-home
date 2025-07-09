@@ -30,6 +30,9 @@ set pastetoggle=<F2>
 nnoremap <silent> <F8> :TlistToggle<CR>
 inoremap <C-J> <C-\><C-O>b
 inoremap <C-K> <C-\><C-O>w
+inoremap <C-BS> <C-W>
+inoremap <C-H> <C-W>
+
 set hlsearch
 set ttymouse=xterm2
 hi comment ctermfg=green
