@@ -25,6 +25,7 @@ mount -t overlay overlay \
 bindfs -o force-user=$3 -o force-group=$4 \
   "$2.overlay" "$2"
 
+echo "Overlay file-system mounted successfully on $2"
 echo -n Press Enter to unmount ...
 read
 
