@@ -5,5 +5,5 @@ if [ $# -lt 2 ]; then
 	exit
 fi
 
-ffmpeg -err_detect ignore_err -i "$1" -c copy "$2"
+ffmpeg -err_detect ignore_err -i "$1" -c copy -map 0 -c:s mov_text "$2"
 
