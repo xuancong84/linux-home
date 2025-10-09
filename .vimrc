@@ -12,6 +12,8 @@
 " mouse can work past the 220th column
 " vimdiff : all text visible (evening scheme)
 
+set nocompatible
+
 filetype plugin indent on
 set mouse=a
 set tabstop=4

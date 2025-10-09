@@ -31,6 +31,7 @@ alias l='less'
 alias ll='ls -alG --color=auto'
 alias lr='less -r'
 alias t='top'
+alias b='btop'
 alias gtop="watch -n 1 \"nvidia-smi | grep '^| \{1,8\}[^ ]'\""
 alias c='cat'
 alias p='ps aux | l'

@@ -120,6 +120,7 @@ copy_if /root/.ssh /full-upgrade/root/
 copy_if /var/log /full-upgrade/var/
 copy_if /etc/crypttab /full-upgrade/etc/
 copy_if /etc/rc.local /full-upgrade/etc/
+copy_if /etc/profile.d/custom.sh /full-upgrade/etc/profile.d/
 
 cp /root/*.sh /root/*.py /full-upgrade/root/
 cp -rf /etc/fstab /etc/exports /etc/host* /etc/sudoers /full-upgrade/etc/
