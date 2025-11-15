@@ -22,12 +22,16 @@ mount -t overlay overlay \
 	-o lowerdir="$1",upperdir="$2.upper",workdir="$2.work" \
 	"$2.overlay"
 
-bindfs -o force-user=$3 -o force-group=$4 \
-  "$2.overlay" "$2"
+bindfs -o force-user=$3 -o force-group=$4 "$2.overlay" "$2"
 
+echo "Overlay file-system mounted successfully on $2"
 echo -n Press Enter to unmount ...
 read
 
-umount "$2"
-umount "$2.overlay"
+if ! umount "$2"; then
+	umount -fl "$2"
+fi
+if ! umount "$2.overlay"; then
+	umount -fl "$2.overlay"
+fi
 

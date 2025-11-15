@@ -5,7 +5,7 @@ if [ `whoami` != "root" ]; then
 	exit 0
 fi
 
-dirs=(bin boot etc lib lib32 lib64 libx32 opt root sbin usr var)
+dirs=(bin etc lib lib32 lib64 libx32 opt root sbin usr var)
 
 pycode="
 import os, sys, argparse
@@ -85,9 +85,9 @@ copy_if () {
 }
 
 
-# START
+# CHECK
 cd /
-
+mkdir -p /full-backup
 if [ ! -d /full-upgrade ] || [ ! -d /full-backup ]; then
 	echo "Abort: /full-upgrade or /full-backup does not exist"
 	exit 1
@@ -109,6 +109,7 @@ if ! file /busybox | grep 'statically'; then
 	exit 1
 fi
 
+# START
 echo Copy over credentials and configs
 python3 -c "$pycode" /etc /full-upgrade/etc
 
@@ -117,21 +118,34 @@ copy_if /etc/NetworkManager /full-upgrade/etc/
 copy_if /etc/openvpn /full-upgrade/etc/
 copy_if /root/.ssh /full-upgrade/root/
 copy_if /var/log /full-upgrade/var/
+copy_if /etc/crypttab /full-upgrade/etc/
+copy_if /etc/rc.local /full-upgrade/etc/
+copy_if /etc/profile.d/custom.sh /full-upgrade/etc/profile.d/
 
+cp /root/*.sh /root/*.py /full-upgrade/root/
 cp -rf /etc/fstab /etc/exports /etc/host* /etc/sudoers /full-upgrade/etc/
 
 echo Perform OS replacement
 cd /full-upgrade
-for f in "${dirs[@]}"; do if [ -e "/$f" ]; then /busybox mv -v "/$f" /full-backup/; fi; /busybox mv -v "$f" /;done
+for f in "${dirs[@]}"; do
+	if mountpoint "/$f"; then
+		cp -rfPp /$f /full-backup/
+		rm -rf /$f/*
+		cp -rfPp $f/* /$f/
+		continue
+	fi
+	if [ -e "/$f" ]; then
+		/busybox mv -v "/$f" /full-backup/
+	fi
+	/busybox mv -v "$f" /;done
 cd /
 
-echo Prepare EFI
-EFI=`mount | grep '/boot/efi' | awk '{print $1}'`
-umount /full-backup/boot/efi
-mount $EFI /boot/efi
-rm -rf /full-backup/boot/efi/EFI/*
-mkdir -p /full-backup/boot/efi/EFI
-mv /boot/efi/EFI/* /full-backup/boot/efi/EFI/
+echo "Replacing /boot ..."
+if [ -d /boot ]; then
+	rsync -avlP /boot /full-backup/
+	rsync -avlP --delete /full-upgrade/boot /
+fi
+rm -rf /boot/efi/EFI/*
 
 echo Install grub
 grub-mkdevicemap
