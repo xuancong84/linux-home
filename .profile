@@ -31,6 +31,7 @@ alias l='less'
 alias ll='ls -alG --color=auto'
 alias lr='less -r'
 alias t='top'
+alias b='btop'
 alias gtop="watch -n 1 \"nvidia-smi | grep '^| \{1,8\}[^ ]'\""
 alias c='cat'
 alias p='ps aux | l'
@@ -44,8 +45,11 @@ alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
 alias sul='sudo -i'
 alias open=xdg-open
 alias yd='~/anaconda3/bin/yt-dlp --embed-subs -R infinite --socket-timeout 3 --cookies-from-browser firefox:/home/xuancong/.mozilla/firefox/'
-alias ydvr='~/anaconda3/bin/yt-dlp -R infinite --socket-timeout 3 --extractor-args "youtube:player-client=android_vr"'
+# For ydvr, browser cookie MUST NOT be specified, or mono video will be downloaded
+alias ydvr='~/anaconda3/bin/yt-dlp -R infinite --socket-timeout 3 --user-agent "" --extractor-args "youtube:player-client=all"'
 alias ta='tmux a'
+alias p8='ping 8.8.8.8'
+alias pg='ping www.google.com'
 alias xp_start='xpra start :100  --start-child=xterm --start-via-proxy=no --opengl=yes'
 alias xp_list='xpra list'
 alias xp_stop='xpra stop :100'
@@ -189,7 +193,7 @@ N: signal for the kill
 31 - SIGSYS" >&2
 		return 0
 	else
-		ps aux | grep "$1" | sed '/grep/d' | awk '{print $2}' | xargs kill $2
+		ps aux --no-headers | grep "$1" | sed '/grep/d' | awk '{print $2}' | xargs kill $2
 	fi
 }
 lowercase() {
