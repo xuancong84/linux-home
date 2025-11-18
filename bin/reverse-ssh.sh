@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $# -lt 3 ]; then
+if [ $# -lt 2 ]; then
 	echo "Usage: $0 ssh-target-username@address serverIP:serverPort:clientIP:clientPort"
 	echo "This establishes a reverse SSH tunnel persistently."
 	exit

@@ -54,6 +54,7 @@ alias xp_start='xpra start :100  --start-child=xterm --start-via-proxy=no --open
 alias xp_list='xpra list'
 alias xp_stop='xpra stop :100'
 alias xp_attach='xpra attach :100'
+alias ld_debug='LD_DEBUG=libs,files VK_LOADER_DEBUG=all'
 
 # multi-line sed
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
@@ -116,7 +117,7 @@ mkv2mp4() {
 		echo "Usage: $0 input.mkv" >&2
 		return
 	fi
-	ffmpeg -y -i "$1" -map 0 -c copy "`echo $1 | sed 's:\.mkv$:.mp4:gi'`"
+	ffmpeg -y -i "$1" -map 0 -c copy -c:s mov_text "`echo $1 | sed 's:\.mkv$:.mp4:gi'`"
 }
 
 mp4_shrink() {
