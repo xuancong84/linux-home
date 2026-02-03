@@ -48,6 +48,7 @@ alias yd='~/anaconda3/bin/yt-dlp --embed-subs -R infinite --socket-timeout 3 --c
 # For ydvr, browser cookie MUST NOT be specified, or mono video will be downloaded
 alias ydvr='~/anaconda3/bin/yt-dlp -R infinite --socket-timeout 3 --user-agent "" --extractor-args "youtube:player-client=all"'
 alias ta='tmux a'
+alias tls='tmux ls'
 alias p8='ping 8.8.8.8'
 alias pg='ping www.google.com'
 alias xp_start='xpra start :100  --start-child=xterm --start-via-proxy=no --opengl=yes'
@@ -63,6 +64,38 @@ alias apy="~/anaconda3/bin/python"
 
 alias test_pytorch="~/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
 alias test_tensorflow="~/anaconda3/bin/python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'"
+
+test_tensorflow_full () {
+  pycode="
+import numpy as np
+import tensorflow as tf
+print('TensorFlow version:', tf.__version__)
+
+with np.load('/usr/share/datasets/mnist.npz') as f:
+    x_train, y_train = f['x_train'], f['y_train']
+    x_test,  y_test  = f['x_test'],  f['y_test']
+
+x_train, x_test = x_train / 255.0, x_test / 255.0
+
+model = tf.keras.models.Sequential([
+  tf.keras.layers.Flatten(input_shape=(28, 28)),
+  tf.keras.layers.Dense(128, activation='relu'),
+  tf.keras.layers.Dropout(0.2),
+  tf.keras.layers.Dense(10)
+])
+
+loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+model.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
+
+model.fit(x_train, y_train, epochs=5)
+model.evaluate(x_test, y_test, verbose=2)
+
+probability_model = tf.keras.Sequential([model, tf.keras.layers.Softmax()])
+print(probability_model(x_test[:5]))
+  ";
+  PYTHONPATH=/opt/anaconda3/PYTHONPATH/tf /opt/anaconda3/bin/python -c "$pycode"
+}
+
 test_nvcc() {
 cat >/tmp/$$.cu <<EOF
 #include <stdio.h>
@@ -109,6 +142,211 @@ int main(){
 }
 EOF
 	nvcc -o /tmp/$$.out /tmp/$$.cu && nvprof /tmp/$$.out || /tmp/$$.out
+	rm -rf /tmp/$$.*
+}
+
+test_cudnn(){
+	cat >/tmp/$$.cu <<EOF
+// test-cudnn.cu
+// Build (typical Ubuntu):
+//   nvcc -O2 test-cudnn.cu -lcudnn -o test-cudnn
+// Run:
+//   ./test-cudnn
+
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <vector>
+#include <cuda_runtime.h>
+#include <cudnn.h>
+
+#define CHECK_CUDA(call) do {                                      \
+  cudaError_t _e = (call);                                         \
+  if (_e != cudaSuccess) {                                         \
+    fprintf(stderr, "CUDA error %s:%d: %s\n",                      \
+            __FILE__, __LINE__, cudaGetErrorString(_e));           \
+    std::exit(1);                                                  \
+  }                                                                \
+} while(0)
+
+#define CHECK_CUDNN(call) do {                                     \
+  cudnnStatus_t _s = (call);                                       \
+  if (_s != CUDNN_STATUS_SUCCESS) {                                \
+    fprintf(stderr, "cuDNN error %s:%d: %s\n",                     \
+            __FILE__, __LINE__, cudnnGetErrorString(_s));          \
+    std::exit(1);                                                  \
+  }                                                                \
+} while(0)
+
+// Simple CPU reference: single batch, NCHW, single in/out channel, 2D conv
+static void conv2d_cpu_nchw(
+    const float* x, int H, int W,
+    const float* w, int R, int S,
+    float* y, int outH, int outW,
+    int padH, int padW, int strideH, int strideW)
+{
+  for (int oh = 0; oh < outH; ++oh) {
+    for (int ow = 0; ow < outW; ++ow) {
+      float acc = 0.0f;
+      for (int r = 0; r < R; ++r) {
+        for (int s = 0; s < S; ++s) {
+          int ih = oh * strideH + r - padH;
+          int iw = ow * strideW + s - padW;
+          if (ih >= 0 && ih < H && iw >= 0 && iw < W) {
+            acc += x[ih * W + iw] * w[r * S + s];
+          }
+        }
+      }
+      y[oh * outW + ow] = acc;
+    }
+  }
+}
+
+int main() {
+  // 1) Basic cuDNN presence check
+  printf("cuDNN runtime version: %lu\n", cudnnGetVersion());
+
+  cudnnHandle_t handle;
+  CHECK_CUDNN(cudnnCreate(&handle));
+
+  // 2) Set up a small, deterministic convolution
+  // Input: N=1, C=1, H=5, W=5
+  const int N = 1, C = 1, H = 5, W = 5;
+  // Filter: K=1, C=1, R=3, S=3
+  const int K = 1, R = 3, S = 3;
+  const int padH = 1, padW = 1;
+  const int strideH = 1, strideW = 1;
+  const int dilationH = 1, dilationW = 1;
+
+  // Host buffers (NCHW, but since N=C=1 it's just H*W)
+  std::vector<float> h_x(H * W);
+  std::vector<float> h_w(R * S);
+
+  // Fill input with 1..25, weights with a simple pattern
+  for (int i = 0; i < H * W; ++i) h_x[i] = float(i + 1);
+  // A simple 3x3 kernel (not all ones, so it's a better test)
+  float kernel[9] = {
+    1.f,  2.f,  1.f,
+    0.f,  0.f,  0.f,
+   -1.f, -2.f, -1.f
+  };
+  for (int i = 0; i < 9; ++i) h_w[i] = kernel[i];
+
+  // Descriptors
+  cudnnTensorDescriptor_t xDesc, yDesc;
+  cudnnFilterDescriptor_t wDesc;
+  cudnnConvolutionDescriptor_t convDesc;
+
+  CHECK_CUDNN(cudnnCreateTensorDescriptor(&xDesc));
+  CHECK_CUDNN(cudnnCreateTensorDescriptor(&yDesc));
+  CHECK_CUDNN(cudnnCreateFilterDescriptor(&wDesc));
+  CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&convDesc));
+
+  CHECK_CUDNN(cudnnSetTensor4dDescriptor(
+      xDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, N, C, H, W));
+
+  CHECK_CUDNN(cudnnSetFilter4dDescriptor(
+      wDesc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, K, C, R, S));
+
+  CHECK_CUDNN(cudnnSetConvolution2dDescriptor(
+      convDesc,
+      padH, padW,
+      strideH, strideW,
+      dilationH, dilationW,
+      CUDNN_CROSS_CORRELATION,   // cuDNN uses cross-correlation by default
+      CUDNN_DATA_FLOAT));
+
+  // Output dims
+  int outN, outC, outH, outW;
+  CHECK_CUDNN(cudnnGetConvolution2dForwardOutputDim(
+      convDesc, xDesc, wDesc, &outN, &outC, &outH, &outW));
+
+  CHECK_CUDNN(cudnnSetTensor4dDescriptor(
+      yDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, outN, outC, outH, outW));
+
+  printf("Conv output dims: N=%d C=%d H=%d W=%d\n", outN, outC, outH, outW);
+
+  // Device buffers
+  float *d_x = nullptr, *d_w = nullptr, *d_y = nullptr;
+  CHECK_CUDA(cudaMalloc(&d_x, sizeof(float) * H * W));
+  CHECK_CUDA(cudaMalloc(&d_w, sizeof(float) * R * S));
+  CHECK_CUDA(cudaMalloc(&d_y, sizeof(float) * outH * outW));
+
+  CHECK_CUDA(cudaMemcpy(d_x, h_x.data(), sizeof(float) * H * W, cudaMemcpyHostToDevice));
+  CHECK_CUDA(cudaMemcpy(d_w, h_w.data(), sizeof(float) * R * S, cudaMemcpyHostToDevice));
+  CHECK_CUDA(cudaMemset(d_y, 0, sizeof(float) * outH * outW));
+
+  // Choose an algorithm (simple + widely supported)
+  cudnnConvolutionFwdAlgo_t algo = CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM;
+
+  size_t workspaceBytes = 0;
+  CHECK_CUDNN(cudnnGetConvolutionForwardWorkspaceSize(
+      handle, xDesc, wDesc, convDesc, yDesc, algo, &workspaceBytes));
+
+  void* d_workspace = nullptr;
+  if (workspaceBytes > 0) {
+    CHECK_CUDA(cudaMalloc(&d_workspace, workspaceBytes));
+  }
+
+  const float alpha = 1.0f, beta = 0.0f;
+
+  // 3) Run cuDNN convolution
+  CHECK_CUDNN(cudnnConvolutionForward(
+      handle,
+      &alpha,
+      xDesc, d_x,
+      wDesc, d_w,
+      convDesc, algo,
+      d_workspace, workspaceBytes,
+      &beta,
+      yDesc, d_y));
+
+  CHECK_CUDA(cudaDeviceSynchronize());
+
+  // Copy result back
+  std::vector<float> h_y(outH * outW);
+  CHECK_CUDA(cudaMemcpy(h_y.data(), d_y, sizeof(float) * outH * outW, cudaMemcpyDeviceToHost));
+
+  // 4) Validate vs CPU reference (tolerant)
+  std::vector<float> ref(outH * outW);
+  conv2d_cpu_nchw(
+      h_x.data(), H, W,
+      h_w.data(), R, S,
+      ref.data(), outH, outW,
+      padH, padW, strideH, strideW);
+
+  double max_abs_err = 0.0;
+  for (int i = 0; i < outH * outW; ++i) {
+    double err = std::fabs(double(h_y[i]) - double(ref[i]));
+    if (err > max_abs_err) max_abs_err = err;
+  }
+
+  printf("Max abs error vs CPU reference: %.8g\n", max_abs_err);
+
+  const double tol = 1e-4; // float + conv should be exact here, but keep a safe tolerance
+  if (max_abs_err <= tol) {
+    printf("\033[1;92mPASSED\033[0m: cuDNN appears installed and working.\n");
+  } else {
+    printf("\033[1;91mFAILED\033[0m: output mismatch (possible setup/library issue).\n");
+    return 2;
+  }
+
+  // Cleanup
+  if (d_workspace) CHECK_CUDA(cudaFree(d_workspace));
+  CHECK_CUDA(cudaFree(d_x));
+  CHECK_CUDA(cudaFree(d_w));
+  CHECK_CUDA(cudaFree(d_y));
+
+  CHECK_CUDNN(cudnnDestroyConvolutionDescriptor(convDesc));
+  CHECK_CUDNN(cudnnDestroyFilterDescriptor(wDesc));
+  CHECK_CUDNN(cudnnDestroyTensorDescriptor(xDesc));
+  CHECK_CUDNN(cudnnDestroyTensorDescriptor(yDesc));
+  CHECK_CUDNN(cudnnDestroy(handle));
+
+  return 0;
+}
+EOF
+	/usr/local/cuda/bin/nvcc -o /tmp/$$.out /tmp/$$.cu -lcudnn && /tmp/$$.out
 	rm -rf /tmp/$$.*
 }
 
