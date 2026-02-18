@@ -362,13 +362,22 @@ mp4_shrink() {
 	if [ $# == 0 ]; then
 		echo "Usage: $0 input.mp4 output.mp4 [crf=30]"
 		echo "ffmpeg -i input.mp4 -vcodec libx265 -crf 30 output.mp4"
-		exit
+		return
 	fi
 	crf=30
 	if [ $# -ge 3 ]; then
 		crf=$3
 	fi
 	ffmpeg -i "$1" -vcodec libx265 -crf $crf "$2"
+}
+
+mp4_scan() {
+	if [ $# == 0 ]; then
+		echo "Usage: $0 input.mp4"
+		echo "This performs file integrity check on MP4 files."
+		return
+	fi
+	ffmpeg -v error -i "$1" -f null -
 }
 
 swapfile() {
