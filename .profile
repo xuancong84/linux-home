@@ -65,6 +65,76 @@ alias apy="~/anaconda3/bin/python"
 alias test_pytorch="~/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
 alias test_tensorflow="~/anaconda3/bin/python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'"
 
+test_pytorch_full ()
+{
+    pycode="
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
+from tqdm import tqdm
+
+print('PyTorch version:', torch.__version__)
+print('CUDA available:', torch.cuda.is_available())
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print('Using device:', device)
+
+with np.load('/usr/share/datasets/mnist.npz') as f:
+    x_train, y_train = f['x_train'], f['y_train']
+    x_test,  y_test  = f['x_test'],  f['y_test']
+
+x_train = torch.tensor(x_train / 255.0, dtype=torch.float32)
+x_test  = torch.tensor(x_test  / 255.0, dtype=torch.float32)
+y_train = torch.tensor(y_train, dtype=torch.long)
+y_test  = torch.tensor(y_test,  dtype=torch.long)
+
+train_loader = DataLoader(TensorDataset(x_train, y_train), batch_size=128, shuffle=True)
+test_loader  = DataLoader(TensorDataset(x_test, y_test), batch_size=1000)
+
+model = nn.Sequential(
+    nn.Flatten(),
+    nn.Linear(28 * 28, 128),
+    nn.ReLU(),
+    nn.Dropout(0.2),
+    nn.Linear(128, 10)
+).to(device)
+
+loss_fn = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters())
+
+model.train()
+for epoch in range(5):
+    pbar = tqdm(train_loader, desc=f'Epoch {epoch + 1}/5', unit='batch')
+    for xb, yb in pbar:
+        xb, yb = xb.to(device), yb.to(device)
+        optimizer.zero_grad()
+        logits = model(xb)
+        loss = loss_fn(logits, yb)
+        loss.backward()
+        optimizer.step()
+        pbar.set_postfix(loss=f'{loss.item():.4f}')
+
+model.eval()
+correct = 0
+total = 0
+with torch.no_grad():
+    for xb, yb in test_loader:
+        xb, yb = xb.to(device), yb.to(device)
+        logits = model(xb)
+        pred = logits.argmax(dim=1)
+        correct += (pred == yb).sum().item()
+        total += yb.size(0)
+
+print(f'Test accuracy: {correct / total:.4f}')
+
+with torch.no_grad():
+    probs = torch.softmax(model(x_test[:5].to(device)), dim=1)
+    print(probs.cpu())
+"
+	/opt/anaconda3/bin/python -c "$pycode"
+}
+
 test_tensorflow_full () {
   pycode="
 import numpy as np
