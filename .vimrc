@@ -24,6 +24,7 @@ set smartindent
 set nowrap
 set backspace=2
 set backspace=indent,eol,start
+set scrolloff=1
 syntax on
 autocmd FileType python set tabstop=4|set shiftwidth=4|set noexpandtab
 

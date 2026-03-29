@@ -29,6 +29,7 @@ def parse_args():
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
 	)
 	p.add_argument("--pam-unlock-log", "-pu", help="Path to the pam-unlock log file")
+	p.add_argument("--except-user", "-ex", help="Path to the pam-unlock log file", default=[], action='append')
 	p.add_argument("wtmp_path", help="Path to wtmp file (e.g., /var/log/wtmp)")
 	p.add_argument("passwd_path", help="Path to passwd file (e.g., /etc/passwd)")
 	p.add_argument("shadow_path", help="Path to shadow file (e.g., /etc/shadow)")
@@ -109,16 +110,16 @@ def parse_pam_unlock_log(path: str) -> Dict[str, dt.datetime]:
 					continue
 
 				# Extract key=value tokens
-				# We only care about PAM_USER and PAM_TYPE
-				pam_type: Optional[str] = None
-				pam_user: Optional[str] = None
+				# We only care about PAM_USER and USER
+				env_user = pam_user = ''
 				for tok in parts[2:]:
-					if tok.startswith("PAM_TYPE="):
-						pam_type = tok.split("=", 1)[1]
+					if tok.startswith("USER="):
+						env_user = tok.split("=", 1)[1]
 					elif tok.startswith("PAM_USER="):
 						pam_user = tok.split("=", 1)[1]
 
-				if pam_type != "auth" or not pam_user:
+				pam_user = pam_user or env_user
+				if not pam_user:
 					continue
 
 				# Parse timestamp with timezone offset, then convert to local naive
@@ -208,11 +209,7 @@ def main():
 	# and ignore non-login shells.
 	candidates: Set[str] = set()
 	for user, (uid, shell) in passwd.items():
-		if user not in shadow:
-			continue
-		if uid == 0:
-			continue
-		if uid < 1000:
+		if user not in shadow or user in args.except_user or uid==0 or uid<1000:
 			continue
 		if [1 for sf in NOLOGIN_SHELLS if shell.endswith(sf)]:
 			continue

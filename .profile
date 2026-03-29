@@ -62,9 +62,7 @@ alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
 alias py3="~/anaconda3/bin/python -i -c \"import os,sys,re,math,random;import pandas as pd;import numpy as np;from collections import *\""
 alias apy="~/anaconda3/bin/python"
 
-alias test_pytorch="~/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
-alias test_tensorflow="~/anaconda3/bin/python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'"
-
+alias test_pytorch="/opt/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
 test_pytorch_full ()
 {
     pycode="
@@ -135,6 +133,11 @@ with torch.no_grad():
 	/opt/anaconda3/bin/python -c "$pycode"
 }
 
+if [ -d /opt/anaconda3/PYTHONPATH/tf ]; then
+	alias test_tensorflow="PYTHONPATH=/opt/anaconda3/PYTHONPATH/tf /opt/anaconda3/bin/python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'"
+else
+	alias test_tensorflow="docker run --gpus all -it --rm nvcr.io/nvidia/tensorflow:24.09-tf2-py3 python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'"
+fi
 test_tensorflow_full () {
   pycode="
 import numpy as np
@@ -163,7 +166,11 @@ model.evaluate(x_test, y_test, verbose=2)
 probability_model = tf.keras.Sequential([model, tf.keras.layers.Softmax()])
 print(probability_model(x_test[:5]))
   ";
-  PYTHONPATH=/opt/anaconda3/PYTHONPATH/tf /opt/anaconda3/bin/python -c "$pycode"
+  if [ -d /opt/anaconda3/PYTHONPATH/tf ]; then
+	  PYTHONPATH=/opt/anaconda3/PYTHONPATH/tf /opt/anaconda3/bin/python -c "$pycode"
+  else
+	  docker run --gpus all -it --rm -v /:/rootfs nvcr.io/nvidia/tensorflow:24.09-tf2-py3 python -c "$pycode"
+  fi
 }
 
 test_nvcc() {
@@ -217,12 +224,6 @@ EOF
 
 test_cudnn(){
 	cat >/tmp/$$.cu <<EOF
-// test-cudnn.cu
-// Build (typical Ubuntu):
-//   nvcc -O2 test-cudnn.cu -lcudnn -o test-cudnn
-// Run:
-//   ./test-cudnn
-
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -510,9 +511,9 @@ N: signal for the kill
 30 - SIGPWR - shutdown, typically from unusual hardware failure 
 31 - SIGSYS" >&2
 		return 0
-	else
-		ps aux --no-headers | grep "$1" | sed '/grep/d' | awk '{print $2}' | xargs kill $2
 	fi
+	a="`ps aux`"
+	echo "$a" | grep "$1" | awk '{print $2}' | xargs kill $2
 }
 lowercase() {
 	awk '{print tolower($0)}'
