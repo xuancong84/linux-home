@@ -124,6 +124,7 @@ copy_if /etc/profile.d/custom.sh /full-upgrade/etc/profile.d/
 
 cp /root/*.sh /root/*.py /full-upgrade/root/
 cp -rf /etc/fstab /etc/exports /etc/host* /etc/sudoers /full-upgrade/etc/
+rsync -avlP --delete /etc/Yubico /full-upgrade/etc/
 rsync --numeric-ids -avlP --delete /var/spool/cron/crontabs /full-upgrade/var/spool/cron/
 
 echo Perform OS replacement

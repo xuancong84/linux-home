@@ -18,7 +18,7 @@ sudo cp ~/.local/share/konsole/* /etc/skel/.local/share/konsole/
 # Copy your custom hotkey settings
 sudo cp ~/.local/share/kxmlgui5/konsole/konsoleui.rc /etc/skel/.local/share/kxmlgui5/konsole/
 # (Optional) If you have global shortcuts to launch Konsole:
-sudo cp ~/.config/kglobalshortcutsrc /etc/skel/.config/
+sudo cp ~/.config/kglobalshortcutsrc ~/.config/khotkeysrc ~/.config/kwinrc /etc/skel/.config/
 
 
 # VS-code extensions
