@@ -573,22 +573,51 @@ set_nvidia() {
 set_intel() {
 	unset __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME
 }
-norm_vol() {
-	if [ $# == 0 ];then
-		echo "Usage: norm_vol file.mp4 level=-20 output.mp4"
+tas() {
+	if [ $# == 0 ]; then
+		echo "Usage: $0 ssh-target"
+		echo "This opens a konsole tab for each tmux session in <ssh-target>"
 		return
 	fi
-	lvl="$2"
-	if [ ! "$lvl" ]; then
-		lvl="-20"
-	fi
-	out="$3"
-	ffmpeg-normalize "$1" -o $$.mp4 -c:a aac -t $lvl -nt rms -f
-	if [ "$out" ]; then
-		mv $$.mp4 "$out"
-	else
-		mv $$.mp4 "$1"
-	fi
+	for i in `ssh $1 tmux ls | awk '{print $1}'`; do
+		session_id=$(qdbus $KONSOLE_DBUS_SERVICE $KONSOLE_DBUS_WINDOW newSession)
+		qdbus $KONSOLE_DBUS_SERVICE /Sessions/$session_id runCommand "bash -l -c 'ssh -YCt $1 tmux a -t $i'; exec bash -l"
+	done
+}
+
+sleep_until() {
+	# Define your target time
+	# Example: 05:00:00/5 means every Friday 5am
+	IFS="/" read -ra arr <<< "$1"
+	TARGET_TIME="${arr[0]}"
+	TARGET_DOW="${arr[1]}"
+	
+	while :; do
+		# Get the current epoch timestamp (seconds since Jan 1, 1970)
+		CURRENT_EPOCH=$(date +%s)
+		
+		# Get the target epoch timestamp
+		# The -d option allows specifying a date/time string
+		TARGET_EPOCH=$(date -d "$TARGET_TIME" +%s)
+		
+		# Calculate the number of seconds to sleep
+		SLEEP_SECONDS=$(( TARGET_EPOCH - CURRENT_EPOCH ))
+		
+		# Check if the target time is in the past
+		while [ "$SLEEP_SECONDS" -lt 0 ]; do
+			SLEEP_SECONDS=$[SLEEP_SECONDS+86400]
+		done
+	
+		echo "It's now $(date)"
+		echo "Sleeping for $SLEEP_SECONDS seconds until $TARGET_TIME..."
+		sleep "$SLEEP_SECONDS"
+
+		if [ ! "$TARGET_DOW" ] || [ $TARGET_DOW != $(date +%u) ]; then
+			break
+		fi
+	done
+	
+	echo "Awake! It's now $(date)"
 }
 
 shopt -s direxpand
