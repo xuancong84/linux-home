@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mkdir -p /etc/skel/.config/
+sudo mkdir -p /etc/skel/.config/
 
 # Desktop and taskbar layout
 sudo cp ~/.config/plasma-org.kde.plasma.desktop-appletsrc /etc/skel/.config/
