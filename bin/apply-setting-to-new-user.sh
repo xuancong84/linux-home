@@ -20,6 +20,10 @@ sudo cp ~/.local/share/kxmlgui5/konsole/konsoleui.rc /etc/skel/.local/share/kxml
 # (Optional) If you have global shortcuts to launch Konsole:
 sudo cp ~/.config/kglobalshortcutsrc ~/.config/khotkeysrc ~/.config/kwinrc /etc/skel/.config/
 
+if [ -s ~/.continue/config.json ]; then
+	sudo mkdir -p /etc/skel/.continue
+	sudo cp ~/.continue/config.json /etc/skel/.continue
+fi
 
 # VS-code extensions
 sudo cp -r ~/.vscode/extensions/* /usr/share/code/resources/app/extensions/
