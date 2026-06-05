@@ -58,6 +58,15 @@ alias xp_stop='xpra stop :100'
 alias xp_attach='xpra attach :100'
 alias ld_debug='LD_DEBUG=libs,files VK_LOADER_DEBUG=all'
 
+vif() {
+	if [ $# == 0 ]; then
+		echo "Usage: $0 fullpath-to-the-file-to-edit"
+		echo "This precreate the directory and edit the file using vim"
+		return
+	fi
+	mkdir -p "`dirname \"$1\"`" && vi "$@"
+}
+
 # multi-line sed
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
 alias py3="~/anaconda3/bin/python -i -c \"import os,sys,re,math,random;import pandas as pd;import numpy as np;from collections import *\""

@@ -17,7 +17,12 @@ def Open(fn, mode='r', **kwargs):
 	return open(fn, mode, **kwargs)
 
 
-is_id_human = lambda its: len(its)>=3 and 20000>=int(its[2])>=1000
+def is_id_human(its):
+	if len(its)<3:
+		return False
+	if its[0] in ['docker','crontab']:
+		return True
+	return 20000>=int(its[2])>=1000
 
 if __name__=='__main__':
 	parser = argparse.ArgumentParser(usage='\$0 src_dir tgt_dir 1>output 2>progress',
@@ -122,11 +127,14 @@ copy_if /etc/crypttab /full-upgrade/etc/
 copy_if /etc/rc.local /full-upgrade/etc/
 copy_if /etc/profile.d/custom.sh /full-upgrade/etc/profile.d/
 
-ls /root/*.sh /root/*.py | while read f; do cp -rf $f /full-upgrade/root/; done
+set +e
+cp -rf /root/*.sh /root/*.py /full-upgrade/root/
 cp -rf /etc/fstab /etc/exports /etc/host* /etc/sudoers /full-upgrade/etc/
 rsync -avlP --delete /etc/Yubico /full-upgrade/etc/
+rsync -avlP --delete /var/lib/docker /full-upgrade/var/lib/
 rsync -avlP --delete /etc/ssh/ssh_host_* /full-upgrade/etc/ssh/
 rsync --numeric-ids -avlP --delete /var/spool/cron/crontabs /full-upgrade/var/spool/cron/
+set -e
 
 echo Perform OS replacement
 cd /full-upgrade
