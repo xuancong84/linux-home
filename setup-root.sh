@@ -7,9 +7,11 @@ fi
 cd "`dirname $0`"
 
 mkdir -p ~/etc.bak
-for f in inputrc profile tmux.conf; do
-	cp /etc/$f ~/etc.bak/
-	cp .$f /etc/
+for f in /etc/inputrc /etc/profile.d/99-moht.sh /etc/tmux.conf; do
+	if [ -s $f ]; then
+		cp $f ~/etc.bak/
+	fi
+	cp .$f $f
 done
 
 if [ -d /etc/vim ]; then
