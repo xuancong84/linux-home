@@ -32,7 +32,7 @@ alias pg='ping www.google.com.sg'
 alias ac='zcat -f'
 alias open=xdg-open
 alias gtop="watch -n 1 \"nvidia-smi | grep '^| \{1,8\}[^ ]'\""
-alias gtop="watch -n 1 \"nvidia-smi --query-gpu=index,name,utilization.gpu,utilization.memory,temperature.gpu,power.draw,power.limit,memory.used,memory.total | sed s:utilization:util:g; ollama ps 2>/dev/null\""
+alias gtop="watch -n 1 \"nvidia-smi --query-gpu=index,name,utilization.gpu,utilization.memory,temperature.gpu,power.draw,power.limit,memory.used,memory.total | sed s:utilization:util:g; echo; ollama ps 2>/dev/null\""
 alias killstop='kill $(jobs -p)'
 alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --prune=now'
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
@@ -54,7 +54,6 @@ alias apy="/opt/anaconda3/bin/python"
 alias tf="PYTHONPATH=/opt/anaconda3/PYTHONPATH/tf"
 alias test_pytorch="/opt/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
 
-unalias -a test_tensorflow
 test_tensorflow() {
 	if [[ "`uname -m`" == x86* ]]; then
 		PYTHONPATH=/opt/anaconda3/PYTHONPATH/tf /opt/anaconda3/bin/python -c 'import tensorflow as tf; print(tf.test.is_gpu_available())'
@@ -63,7 +62,6 @@ test_tensorflow() {
 	fi
 }
 
-unalias -a test_tensorflow_full
 test_tensorflow_full() {
   pycode="
 import numpy as np
@@ -99,7 +97,6 @@ print(probability_model(x_test[:5]))
 	fi
 }
 
-unalias -a test_pytorch_full
 test_pytorch_full()
 {
     pycode="
@@ -170,7 +167,6 @@ with torch.no_grad():
 	/opt/anaconda3/bin/python -c "$pycode"
 }
 
-unalias -a test_cudnn_profile
 test_cudnn_profile() {
     /opt/anaconda3/bin/python <<'PY'
 import torch
@@ -253,7 +249,6 @@ else:
 PY
 }
 
-unalias -a test_cudnn_full
 test_cudnn_full() 
 { 
     pycode="
@@ -384,7 +379,6 @@ print('cuDNN convolution test completed successfully.')
     /opt/anaconda3/bin/python -c "$pycode"
 }
 
-unalias -a test_nvcc
 test_nvcc(){
 cat >/tmp/$$.cu <<EOF
 #include <stdio.h>
@@ -434,7 +428,6 @@ EOF
 	rm -rf /tmp/$$.*
 }
 
-unalias -a test_cudnn
 test_cudnn(){
 	cat >/tmp/$$.cu <<EOF
 // test-cudnn.cu
@@ -640,7 +633,6 @@ EOF
 	rm -rf /tmp/$$.*
 }
 
-unalias -a mp4_shrink
 mp4_shrink() {
 	if [ $# == 0 ]; then
 		echo "Usage: $0 input.mp4 output.mp4 [crf=30]"
@@ -654,7 +646,6 @@ mp4_shrink() {
 	ffmpeg -i "$1" -vcodec libx265 -crf $crf "$2"
 }
 
-unalias -a swapfile
 swapfile() {
 	if [ $# != 2 ]; then
 		echo "Usage: $0 file1 file2"
@@ -667,7 +658,6 @@ swapfile() {
 	mv "$tmp" "$2"
 }
 
-unalias -a adb_broadcast
 adb_broadcast() {
 	if [ $# == 0 ]; then
 		echo "Usage: $0 <file-fullpath>"
@@ -677,7 +667,6 @@ adb_broadcast() {
 	adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://$1
 }
 
-unalias -a killallbyname
 killallbyname() {
 	if [ $# == 0 ]; then
 		echo -e "Usage: ${FUNCNAME[0]} proc-search-pattern [-N]
@@ -722,22 +711,18 @@ N: signal for the kill
 	echo "$a" | grep "$1" | awk '{print $2}' | xargs kill $2
 }
 
-unalias -a lowercase
 lowercase() {
 	awk '{print tolower($0)}'
 }
 
-unalias -a uppercase
 uppercase() {
 	awk '{print toupper($0)}'
 }
 
-unalias -a random_string
 random_string() {
     cat /dev/urandom | tr -dc 'a-km-zA-HJ-NP-Z2-9' | fold -w ${1:-32} | head -n 1
 }
 
-unalias -a m4a_concat
 m4a_concat() {
 	if [ $# -lt 3 ]; then
 		echo "Usage: $0 file1.m4a file2.m4a combined-out.m4a" >&2
@@ -750,7 +735,6 @@ m4a_concat() {
 	rm -f "$3".*
 }
 
-unalias -a gn
 gn() {
     if [ $# == 0 ]; then
         echo "Usage: gnumeric [input.csv/input.csv.gz]" >&2
@@ -766,7 +750,6 @@ gn() {
     fi
 }
 
-unalias -a create_ssl_x509
 create_ssl_x509() {
 	if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then echo "Usage: $0 [days=3650] [encryption=rsa:2048] [output-prefix=ssl(.key+.crt)]" >&2; return; fi
 	days=3650
@@ -778,17 +761,14 @@ create_ssl_x509() {
 	openssl req -x509 -sha256 -nodes -days $days -newkey $enc -keyout $out.key -out $out.crt
 }
 
-unalias -a ctop
 ctop() {
 	watch -n 1 "cat /proc/cpuinfo | grep '^cpu MHz'"
 }
 
-unalias -a mdcd
 mdcd() {
 	mkdir -p "$1" && cd "$1"
 }
 
-unalias -a vif
 vif() {
 	if [ $# == 0 ]; then
 		echo "Usage: $0 fullpath-to-the-file-to-edit"
@@ -798,17 +778,14 @@ vif() {
 	mkdir -p "`dirname \"$1\"`" && vi "$@"
 }
 
-unalias -a set_nvidia
 set_nvidia() {
 	__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia
 }
 
-unalias -a set_intel
 set_intel() {
 	unset __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME
 }
 
-unalias -a norm_vol
 norm_vol() {
 	if [ $# == 0 ];then
 		echo "Usage: norm_vol file.mp4 level=-20 output.mp4"
