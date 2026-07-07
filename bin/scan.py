@@ -166,12 +166,13 @@ def compare(
 ) -> Tuple[int, int, int, int]:
 	"""Recursively compare ``path_a`` (local) with ``path_b`` (local or S3).
 
-	Returns a tuple ``(scanned, extra_a, extra_b, diff)`` where:
+	Returns a tuple ``(scanned, extra_a, extra_b, diff, ignored)`` where:
 	- ``scanned``   – total number of items examined (files + dirs)
 	- ``extra_a``   – items only present in A
 	- ``extra_b``   – items only present in B
 	- ``diff``      – files present in both sides but differing in size (or
 	content when ``compare_content`` is True).
+	- ``ignored``   - items ignored due to ignore_regex
 	"""
 	# Counters
 	scanned = ignored = extra_a = extra_b = diff = 0
@@ -195,7 +196,7 @@ def compare(
 		all_files = set(files_a) | set(files_b)
 		for name in all_files:
 			scanned += 1
-			
+
 			if should_ignore(os.path.join(a_cur, name), ignore_regex):
 				ignored += 1
 				continue
@@ -271,10 +272,10 @@ def compare(
 			# Both have the directory – descend.
 			stack.append((a_sub, b_sub, b_is_sub_s3))
 		# Update progress line
-		print(f"scanned={scanned} extra-A={extra_a} extra-B={extra_b} diff={diff}", end='\r', file=sys.stderr, flush=True)
+		print(f"scanned={scanned} extra-A={extra_a} extra-B={extra_b} diff={diff} ignored={ignored}", end='\r', file=sys.stderr, flush=True)
 	# Ensure final newline
 	print(file=sys.stderr, flush=True)
-	return scanned, extra_a, extra_b, diff
+	return scanned, extra_a, extra_b, diff, ignored
 
 # ---------------------------------------------------------------------------
 # CLI entry point
@@ -319,9 +320,9 @@ def main() -> None:
 			sys.exit(f"Error: folderB '{args.folderB}' does not exist or is not a directory.")
 		path_b = args.folderB
 
-	scanned, extra_a, extra_b, diff = compare(args.folderA, path_b, args.compare_content, args.reconcile, args.ignore_regex)
+	scanned, extra_a, extra_b, diff, ignored = compare(args.folderA, path_b, args.compare_content, args.reconcile, args.ignore_regex)
 	# Final summary (already printed by compare, but repeat for clarity)
-	print(f"Total scanned: {scanned}, extra in A: {extra_a}, extra in B: {extra_b}, differing files: {diff}")
+	print(f"Total scanned: {scanned}, extra in A: {extra_a}, extra in B: {extra_b}, differing files: {diff}, ignored: {ignored}")
 
 if __name__ == "__main__":
 	main()
