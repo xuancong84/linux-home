@@ -9,6 +9,10 @@ export ANTHROPIC_DEFAULT_OPUS_MODEL=comp9:Qwen3.6-35B-A3B
 export ANTHROPIC_DEFAULT_SONNET_MODEL=comp9:Qwen3.6-35B-A3B
 export ANTHROPIC_DEFAULT_HAIKU_MODEL=comp9:Qwen3.6-35B-A3B
 
+alias claude_use_anthropic='unset ANTHROPIC_BASE_URL;export ANTHROPIC_API_KEY=$CLAUDE_API_KEY;unset ANTHROPIC_AUTH_TOKEN;unset DISABLE_AUTOUPDATER;unset DISABLE_UPDATES;unset ANTHROPIC_DEFAULT_OPUS_MODEL;unset ANTHROPIC_DEFAULT_SONNET_MODEL;unset ANTHROPIC_DEFAULT_HAIKU_MODEL'
+alias claude_use_comp9='export ANTHROPIC_BASE_URL=http://192.168.1.9:9001;export ANTHROPIC_API_KEY=dummy;unset ANTHROPIC_AUTH_TOKEN;export DISABLE_AUTOUPDATER=1;export DISABLE_UPDATES=1;export ANTHROPIC_DEFAULT_OPUS_MODEL=comp9:Qwen3.6-35B-A3B;export ANTHROPIC_DEFAULT_SONNET_MODEL;export ANTHROPIC_DEFAULT_HAIKU_MODEL=comp9:Qwen3.6-35B-A3B'
+alias ollama_log='journalctl -f -e -u ollama'
+
 if [ -n "$SSH_TTY" ] || [ -n "$SSH_CONNECTION" ]; then
 	export GDK_BACKEND=x11
 	export QT_QPA_PLATFORM=xcb
@@ -40,8 +44,6 @@ alias nv_run='DRI_PRIME=pci-0000_01_00_0 __VK_LAYER_NV_optimus=NVIDIA_only __NV_
 alias megaraid_check='/opt/MegaRAID/MegaCli/MegaCli64 -LdPdInfo -a0'
 alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
 alias sul='sudo -i'
-alias ta='tmux a'
-alias tls='tmux ls'
 alias xp_start='xpra start :100  --start-child=xterm --start-via-proxy=no --opengl=yes'
 alias xp_list='xpra list'
 alias xp_stop='xpra stop :100'
@@ -53,6 +55,28 @@ alias py3="/opt/anaconda3/bin/python -i -c \"import os,sys,re,math,random;import
 alias apy="/opt/anaconda3/bin/python"
 alias tf="PYTHONPATH=/opt/anaconda3/PYTHONPATH/tf"
 alias test_pytorch="/opt/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
+
+alias tls='tmux ls'
+ta() {
+	a="`tmux ls -F '#S'`"
+	if [ "$a" ]; then
+		if [ "$1" ]; then
+			if [[ "$a" == *"$1"* ]]; then
+				tmux a -t "$1"
+			else
+				tmux new -t "$1"
+			fi
+		else
+			tmux a
+		fi
+	else
+		if [ "$1" ]; then
+			tmux new -t "$1"
+		else
+			tmux
+		fi
+	fi
+}
 
 test_tensorflow() {
 	if [[ "`uname -m`" == x86* ]]; then
