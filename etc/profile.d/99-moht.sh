@@ -1,16 +1,9 @@
 # MOHT-specific configs
-export ANTHROPIC_BASE_URL=http://10.8.0.9:9001
-export ANTHROPIC_API_KEY=dummy
-#export ANTHROPIC_AUTH_TOKEN=dummy
-unset ANTHROPIC_AUTH_TOKEN
-export DISABLE_AUTOUPDATER=1
-export DISABLE_UPDATES=1
-export ANTHROPIC_DEFAULT_OPUS_MODEL=comp9:Qwen3.6-35B-A3B
-export ANTHROPIC_DEFAULT_SONNET_MODEL=comp9:Qwen3.6-35B-A3B
-export ANTHROPIC_DEFAULT_HAIKU_MODEL=comp9:Qwen3.6-35B-A3B
+export CLAUDE_CODE_MAX_OUTPUT_TOKENS=32768
 
 alias claude_use_anthropic='unset ANTHROPIC_BASE_URL;export ANTHROPIC_API_KEY=$CLAUDE_API_KEY;unset ANTHROPIC_AUTH_TOKEN;unset DISABLE_AUTOUPDATER;unset DISABLE_UPDATES;unset ANTHROPIC_DEFAULT_OPUS_MODEL;unset ANTHROPIC_DEFAULT_SONNET_MODEL;unset ANTHROPIC_DEFAULT_HAIKU_MODEL'
-alias claude_use_comp9='export ANTHROPIC_BASE_URL=http://192.168.1.9:9001;export ANTHROPIC_API_KEY=dummy;unset ANTHROPIC_AUTH_TOKEN;export DISABLE_AUTOUPDATER=1;export DISABLE_UPDATES=1;export ANTHROPIC_DEFAULT_OPUS_MODEL=comp9:Qwen3.6-35B-A3B;export ANTHROPIC_DEFAULT_SONNET_MODEL;export ANTHROPIC_DEFAULT_HAIKU_MODEL=comp9:Qwen3.6-35B-A3B'
+alias claude_use_comp9='export ANTHROPIC_BASE_URL=http://10.8.0.9:9001;export ANTHROPIC_API_KEY=dummy;unset ANTHROPIC_AUTH_TOKEN;export DISABLE_AUTOUPDATER=1;export DISABLE_UPDATES=1;export ANTHROPIC_DEFAULT_OPUS_MODEL=comp9:Qwen3.6-35B-A3B;export ANTHROPIC_DEFAULT_SONNET_MODEL;export ANTHROPIC_DEFAULT_HAIKU_MODEL=comp9:Qwen3.6-35B-A3B'
+alias claude_use_none='unset ANTHROPIC_BASE_URL;unset ANTHROPIC_API_KEY;unset ANTHROPIC_AUTH_TOKEN;unset DISABLE_AUTOUPDATER;unset DISABLE_UPDATES;unset ANTHROPIC_DEFAULT_OPUS_MODEL;unset ANTHROPIC_DEFAULT_SONNET_MODEL;unset ANTHROPIC_DEFAULT_HAIKU_MODEL'
 alias ollama_log='journalctl -f -e -u ollama'
 
 if [ -n "$SSH_TTY" ] || [ -n "$SSH_CONNECTION" ]; then
@@ -759,6 +752,10 @@ m4a_concat() {
 	rm -f "$3".*
 }
 
+mkv2mp4() {
+	ffmpeg -i "$1" -c:v copy -c:a copy -c:s mov_text "${@:2}"
+}
+
 gn() {
     if [ $# == 0 ]; then
         echo "Usage: gnumeric [input.csv/input.csv.gz]" >&2
@@ -828,9 +825,15 @@ norm_vol() {
 	fi
 }
 
+ytdlp=
 if [ -s ~/anaconda3/bin/yt-dlp ]; then
-	alias yd='~/anaconda3/bin/yt-dlp --embed-subs -R infinite --socket-timeout 3 --cookies-from-browser firefox:/home/xuancong/.mozilla/firefox/'
-	alias ydvr='~/anaconda3/bin/yt-dlp -R infinite --socket-timeout 3 --user-agent "" --extractor-args "youtube:player-client=web"'
+	ytdlp=~/anaconda3/bin/yt-dlp
+elif [ -s ~/miniconda3/bin/yt-dlp ]; then
+	ytdlp=~/miniconda3/bin/yt-dlp
+fi
+if [ "$ytdlp" ]; then
+	alias yd="$ytdlp --remote-components ejs:github --embed-subs -R infinite --socket-timeout 3 --cookies-from-browser firefox:$HOME/.mozilla/firefox/"
+	alias ydvr="$ytdlp --remote-components ejs:github -R infinite --socket-timeout 3 --user-agent '' --extractor-args 'youtube:player-client=web'"
 fi
 
 shopt -s direxpand
@@ -838,4 +841,5 @@ shopt -s direxpand
 # `less` can view archives directly (.tar.gz, .zip, etc.)
 export LESSOPEN="| /usr/bin/lesspipe %s";
 export LESSCLOSE="/usr/bin/lesspipe %s %s";
+export PS1="\[\e]0;\u@\h: \w\a\]\[\e[1;35m\]\u\[\e[0m\]@\[\e[1;36m\]\H\[\e[0m\]:\[\e[1;32m\]\w\[\e[0m\]\[\e[1;32m\]$\[\e[0m\] "
 
