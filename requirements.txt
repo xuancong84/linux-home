@@ -1,0 +1,93 @@
+
+#
+adjustText
+#    Anaconda for python 3.8
+Autograd
+bitsandbytes
+#Bundle 1: Software
+#Bundle 2: Python modules (install using `pip` or from github source)
+captum
+catboost
+#    catboost https://catboost.ai/docs/concepts/python-installation.html
+causalml
+clarabel
+cvxpy
+cycler
+dask
+datasets
+evaluate
+flask
+gensim
+geopandas
+GPflow
+GPy
+#    htop
+ipython
+jinja2
+# Keep this one up to date
+lightgbm
+#    lightGBM https://lightgbm.readthedocs.io/en/latest/Installation-Guide.html
+lightning
+#    LIME
+LIME
+matplotlib
+modin
+# MOHT
+mpmath
+#    networkx
+networkx
+nltk
+numpy
+Optuna
+ortools
+pandas
+#    pandas-profiling https://github.com/pandas-profiling/pandas-profiling/blob/master/README.md
+#    PDPbox
+PDPbox
+peft
+pip-search
+#    plotly
+plotly
+psycopg2
+pyarrow
+pymc
+pyogrio
+pyparsing
+pyproj
+pypsm
+PySTAN
+python-dateutil
+#    Python extension for visual studio code https://marketplace.visualstudio.com/items?itemName=ms-python.python
+pytz
+pyyaml
+qdldl
+scikit-learn
+scikit-plot
+scipy
+scs
+sentencepiece
+#    shap
+shap
+SQLAlchemy
+statsmodels
+sympy
+tensorboard
+tensorflow
+#    tensorflow 2.3.2 (latest)
+termcolor
+#    tmux
+tokenizers
+torch
+torchaudio
+torchvision
+transformers
+tzdata
+virtualenv
+#    Visual Studio Code
+#    xgboost
+xgboost
+zipp
+zstd
+pgsrip
+easyocr
+#from causalml.metrics import plot_qini

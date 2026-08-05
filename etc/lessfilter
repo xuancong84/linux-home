@@ -1,0 +1,74 @@
+#!/bin/sh
+
+file=$1
+mime=$(file -Lb --mime-type -- "$file" 2>/dev/null) || exit 1
+
+detect_kitty_graphics()
+{
+	command -v kitten >/dev/null 2>&1 || return 1
+
+	kitten icat \
+		--detect-support \
+		--detection-timeout 1 \
+		</dev/tty 2>&1
+}
+
+case "$mime" in
+	image/*)
+		transfer=
+		if transfer=$(detect_kitty_graphics)
+		then
+			case "$transfer" in
+				file|memory|stream)
+					kitten icat \
+						--stdin=no \
+						--transfer-mode="$transfer" \
+						-- "$file" \
+						</dev/tty >/dev/tty 2>/dev/tty
+					;;
+				*)
+					chafa \
+						--format=symbols \
+						--animate=off \
+						-- "$file" \
+						</dev/tty >/dev/tty 2>/dev/tty
+					;;
+			esac
+		else
+			chafa \
+				--format=symbols \
+				--animate=off \
+				-- "$file" \
+				</dev/tty >/dev/tty 2>/dev/tty
+		fi
+		;;
+
+	video/*)
+		if ! command -v mpv >/dev/null 2>&1
+		then
+			printf '%s\n' \
+				"Cannot preview video: mpv is not installed." \
+				>/dev/tty
+		elif transfer=$(detect_kitty_graphics)
+		then
+			# Pixel-based terminal playback.
+			mpv \
+				--profile=sw-fast \
+				--vo=kitty \
+				--really-quiet \
+				-- "$file" \
+				</dev/tty >/dev/tty 2>/dev/tty
+		else
+			# Portable Unicode-block terminal playback.
+			mpv \
+				--profile=sw-fast \
+				--vo=tct \
+				--really-quiet \
+				-- "$file" \
+				</dev/tty >/dev/tty 2>/dev/tty
+		fi
+		;;
+esac
+
+# Continue into Ubuntu's normal lesspipe handler.
+exit 1

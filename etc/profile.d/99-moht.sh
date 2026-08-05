@@ -18,7 +18,7 @@ if [[ "$SHELL" =~ /bash ]]; then
 fi
 
 # General Linux Shortcuts
-alias l='less'
+alias l='LESS="${LESS:+$LESS }-X" less'
 alias ll='ls -al --color=auto'
 alias lr='less -r'
 alias t='top'
@@ -37,6 +37,8 @@ alias nv_run='DRI_PRIME=pci-0000_01_00_0 __VK_LAYER_NV_optimus=NVIDIA_only __NV_
 alias megaraid_check='/opt/MegaRAID/MegaCli/MegaCli64 -LdPdInfo -a0'
 alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
 alias sul='sudo -i'
+alias showmyip='curl https://ipinfo.io/ip'
+alias ld_debug='LD_DEBUG=libs,files VK_LOADER_DEBUG=all'
 alias xp_start='xpra start :100  --start-child=xterm --start-via-proxy=no --opengl=yes'
 alias xp_list='xpra list'
 alias xp_stop='xpra stop :100'
@@ -841,5 +843,5 @@ shopt -s direxpand
 # `less` can view archives directly (.tar.gz, .zip, etc.)
 export LESSOPEN="| /usr/bin/lesspipe %s";
 export LESSCLOSE="/usr/bin/lesspipe %s %s";
-export PS1="\[\e]0;\u@\h: \w\a\]\[\e[1;35m\]\u\[\e[0m\]@\[\e[1;36m\]\H\[\e[0m\]:\[\e[1;32m\]\w\[\e[0m\]\[\e[1;32m\]$\[\e[0m\] "
+export PS1="\[\e]0;\u@\h: \w\a\]\[\e[1;35m\]\u\[\e[0m\]@\[\e[1;36m\]\H\[\e[0m\]:\[\e[1;32m\]\w\[\e[0m\]\[\e[1;32m\]\\$\[\e[0m\] "
 
