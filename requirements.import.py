@@ -44,6 +44,7 @@ import stan
 import pytz
 import yaml
 import qdldl
+import scikitplot
 import scipy
 import scs
 import sentencepiece
@@ -65,7 +66,7 @@ import xgboost
 import zipp
 import zstd
 
+## PYTHONPATH=tf (numpy 2)
 #import pymc
-#import scikitplot
 #import tensorflow
 #import gpflow

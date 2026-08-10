@@ -23,4 +23,15 @@ curl
 chafa
 kitty
 mpv
+gimp
+timg
+poppler-utils
+
+# cargo
+xleak
+doxx
+
 (R)
+rstudio
+
+

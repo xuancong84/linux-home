@@ -1,0 +1,213 @@
+#!/bin/sh
+# ~/.lessfilter — user preview filter called by lesspipe(1).
+# Exit 0 = we produced output for less; exit 1 = fall through to lesspipe defaults.
+
+file="$1"
+[ -e "$file" ] || exit 1
+
+mime=$(file --brief --mime-type --dereference -- "$file" 2>/dev/null)
+
+# stdout is a pipe here, so get the real terminal size from the controlling tty
+size=$( (stty size < /dev/tty) 2>/dev/null )
+rows=${size%% *}
+cols=${size##* }
+rows=${rows:-40}
+cols=${cols:-100}
+
+supports_kitty_graphics() {
+	if [ -n "$TMUX" ]; then
+		# under tmux, icat places images via unicode placeholders, which the
+		# outer terminal must render; kitty/wezterm/ghostty do, konsole does NOT
+		# (it draws the image misplaced and shows placeholder glyph garbage)
+		case "$(tmux display-message -p '#{client_termname}' 2>/dev/null)" in
+			*kitty*|*wezterm*|*ghostty*) ;;
+			*) return 1 ;;
+		esac
+		# verify passthrough actually reaches the terminal (allow-passthrough on)
+		kitten icat --detect-support >/dev/null 2>&1
+		return $?
+	fi
+	# fast path: we're inside kitty itself
+	[ -n "$KITTY_WINDOW_ID" ] && return 0
+	[ "${TERM#*kitty}" != "$TERM" ] && return 0
+	# otherwise ask the terminal directly — catches konsole/wezterm/ghostty, which
+	# speak the kitty graphics protocol without setting kitty env vars
+	kitten icat --detect-support >/dev/null 2>&1
+}
+
+show_image() {
+	# kitty graphics escapes only survive `less -r` (raw mode); chafa symbols work with `less -R`
+	if [ "${LESS#*r}" != "$LESS" ] && supports_kitty_graphics; then
+		# under tmux, icat draws via unicode-placeholder text lines; a line exactly
+		# as wide as the pane wraps at the margin AND gets less's newline, leaving
+		# a blank row after every image row (black stripes) — keep 1 column spare
+		# stream = inline base64 in the escape codes; the only transfer mode all
+		# kitty-graphics terminals (konsole, wezterm, ...) implement, unlike memory/file.
+		w=$cols mode=stream
+		if [ -n "$TMUX" ]; then
+			# kitty+tmux, icat's own unicode-placeholder rows already advance
+			# the cursor by some number of real newlines before we get here,
+			# so matching h exactly drifts and less's status line (which shows
+			# the filename) ends up overlapping the image instead of sitting
+			# below it. Instead, we use timg to display image in tmux.
+			if timg -pk "$1" ; then
+				return 1
+			fi
+		else
+			h=$((rows - 1))
+			# home + clear before drawing: if less starts writing with the cursor at
+			# the bottom (e.g. right after ls), icat restores the cursor there and the
+			# padding newlines below scroll the freshly drawn image off the screen
+			printf '\033[H\033[J'
+			if kitten icat --clear --silent --stdin=no --transfer-mode=$mode \
+				--place "${w}x${h}@0x0" -- "$1" 2>/dev/null; then
+				# kitty+no-tmux: match the padding to the image's real row count:
+				for i in $(seq 2 $h); do printf '\n'; done
+				return 1
+			fi
+		fi
+	fi
+	# symbols format renders through `less -R`; other chafa formats (sixel/kitty) need `less -r`
+	chafa -f symbols --size "${cols}x$((rows - 4))" -- "$1"
+}
+
+show_video() {
+	if ! command -v mpv >/dev/null 2>&1; then
+		if ! command -v timg >/dev/null 2>&1; then
+			printf "Cannot preview video: mpv is not installed.\n" >/dev/tty
+		else
+			timg "$file"
+		fi
+	elif transfer=$(supports_kitty_graphics)
+	then
+		# Pixel-based terminal playback.
+		mpv --profile=sw-fast --vo=kitty --really-quiet -- "$file" </dev/tty >/dev/tty 2>/dev/tty
+	else
+		# Portable Unicode-block terminal playback.
+		mpv --profile=sw-fast --vo=tct --really-quiet -- "$file" </dev/tty >/dev/tty 2>/dev/tty
+	fi
+	return 1
+}
+
+show_pptx() {
+	file="$1"
+	workdir=$(mktemp -d "${TMPDIR:-/tmp}/lessfilter-pptx.XXXXXX") || return 1
+	trap 'rm -rf "$workdir"' EXIT
+
+	# soffice startup + conversion is the slow part (often several seconds); print
+	# this immediately so `less` shows it right away instead of a blank/frozen screen
+	printf 'Converting %s to PDF, please wait...\n' "${file##*/}"
+
+	# unique -env:UserInstallation avoids "profile already in use" failures when
+	# soffice previews of several pptx files overlap (e.g. fast scrolling in a
+	# file manager); soffice errors out on a trailing "--" so it's omitted here
+	# even though other tools in this script use it before the filename.
+	if ! soffice --headless --norestore \
+		"-env:UserInstallation=file://$workdir/ooprofile" \
+		--convert-to pdf --outdir "$workdir" "$file" >/dev/null 2>&1
+	then
+		printf 'Cannot preview %s: soffice failed to convert it to PDF.\n' "${file##*/}"
+		return 0
+	fi
+
+	pdf=$workdir/${file##*/}
+	pdf=${pdf%.*}.pdf
+	if [ ! -e "$pdf" ]; then
+		printf 'Cannot preview %s: no PDF was produced.\n' "${file##*/}"
+		return 0
+	fi
+
+	npages=$(pdfinfo "$pdf" 2>/dev/null | sed -n 's/^Pages: *//p')
+	printf 'Rendering %s slide(s)...\n' "${npages:-the}"
+	pdftoppm -png -r 100 -- "$pdf" "$workdir/slide" 2>/dev/null
+	set -- "$workdir"/slide-*.png
+	if [ ! -e "$1" ]; then
+		printf 'Cannot preview %s: no slides could be rendered.\n' "${file##*/}"
+		return 0
+	fi
+	total=$#
+
+	kitty_ok=0
+	[ "${LESS#*r}" != "$LESS" ] && supports_kitty_graphics && kitty_ok=1
+
+	n=0
+	for slide in "$@"; do
+		n=$((n + 1))
+		if [ "$kitty_ok" = 1 ] && [ -n "$TMUX" ]; then
+			printf 'Slide %d/%d -- %s\n' "$n" "$total" "${file##*/}"
+			timg -pk "$slide"
+		elif [ "$kitty_ok" = 1 ]; then
+			# each slide is padded to a full screen so plain `less` paging
+			# (space/b, PgDn/PgUp) advances one slide at a time, leaving
+			# :n/:p free to switch between actual files as usual
+			#
+			# --place leaves the cursor at the image's top-left corner, not
+			# below it, so the image is shrunk by one row to leave row (h+1)
+			# permanently blank; the cursor is parked there, one row clear of
+			# the image, instead of sitting on top of the image itself where
+			# it would otherwise look "stuck behind" the picture once less
+			# (or the shell, after quitting) draws its own line on top of it.
+			h=$((rows - 3))
+			printf '\033[H\033[J'
+			printf 'Slide %d/%d -- %s\n' "$n" "$total" "${file##*/}"
+			kitten icat --clear --silent --stdin=no --transfer-mode=stream \
+				--place "${cols}x${h}@0x1" -- "$slide" 2>/dev/null
+			i=2
+			while [ $i -le $((h + 1)) ]; do
+				printf '\n'
+				i=$((i + 1))
+			done
+		else
+			printf 'Slide %d/%d -- %s\n' "$n" "$total" "${file##*/}"
+			out=$(chafa -f symbols --size "${cols}x$((rows - 5))" -- "$slide")
+			printf '%s\n' "$out"
+			pad=$((rows - 2 - $(printf '%s\n' "$out" | wc -l)))
+			i=0
+			while [ $i -lt $pad ]; do
+				printf '\n'
+				i=$((i + 1))
+			done
+		fi
+	done
+	return 0
+}
+
+case "$mime" in
+	image/*)
+		show_image "$file" && exit 0
+		;;
+	application/vnd.openxmlformats-officedocument.presentationml.presentation)
+		show_pptx "$file" && exit 0
+		;;
+	video/*)
+		show_video "$file"
+		# show_video always returns 1 (it drew directly to /dev/tty); without
+		# this, falling through to `exit 1` makes less/lesspipe treat the file
+		# as unrecognized binary and prompt "see it anyway?" before :n/:p work
+		file "$file"
+		printf '(finished: %s — press :n / :p to switch videos)\n' "${file##*/}"
+		exit 0
+		;;
+	application/vnd.openxmlformats-officedocument.spreadsheetml.sheet|\
+	application/vnd.ms-excel|application/vnd.oasis.opendocument.spreadsheet)
+		xleak -i --max-rows 0 -- "$file" </dev/tty >/dev/tty 2>/dev/tty && exit 0
+		;;
+	application/vnd.openxmlformats-officedocument.wordprocessingml.document)
+		doxx --export ansi --force-ui --terminal-width "$cols" -- "$file" && exit 0
+		;;
+esac
+
+# fallback on extension in case file(1) misidentifies the MIME type
+case "$(printf '%s' "$file" | tr '[:upper:]' '[:lower:]')" in
+	*.xlsx|*.xls|*.xlsm|*.ods)
+		xleak --max-rows 0 -- "$file" && exit 0
+		;;
+	*.docx)
+		doxx --export ansi --terminal-width "$cols" -- "$file" && exit 0
+		;;
+	*.pptx)
+		show_pptx "$file" && exit 0
+		;;
+esac
+
+exit 1

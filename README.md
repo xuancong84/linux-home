@@ -1,11 +1,13 @@
 # Linux/Ubuntu professional home folder configuration files and common toolkits
 
 This is my Linux/Ubuntu home folder:
-- configuration files (e.g., .profile, .vimrc, .tmux.conf, .inputrc, etc.)
+- configuration files (e.g., .profile, .vimrc, .tmux.conf, .inputrc, .lessfilter, etc.)
 - common toolkits in $HOME/bin
 - a python-based apt-mirror.py that works better than apt-mirror
 - CSV previewer using gnumeric
 - toggle touchscreen
+
+The world's best lessfilter allows you to preview images, videos, docx, pptx, xlsx, etc.
 
 Common toolkits:
 - mp4-\*.sh : MP4 editing toolkits (e.g., add .srt subtitles, reduce file size, trim beginning and end, concatenate, convert to gif, etc.)
