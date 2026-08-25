@@ -24,7 +24,7 @@ supports_kitty_graphics() {
 			*) return 1 ;;
 		esac
 		# verify passthrough actually reaches the terminal (allow-passthrough on)
-		kitten icat --detect-support >/dev/null 2>&1
+		kitty +kitten icat --detect-support >/dev/null 2>&1
 		return $?
 	fi
 	# fast path: we're inside kitty itself
@@ -32,7 +32,7 @@ supports_kitty_graphics() {
 	[ "${TERM#*kitty}" != "$TERM" ] && return 0
 	# otherwise ask the terminal directly — catches konsole/wezterm/ghostty, which
 	# speak the kitty graphics protocol without setting kitty env vars
-	kitten icat --detect-support >/dev/null 2>&1
+	kitty +kitten icat --detect-support >/dev/null 2>&1
 }
 
 show_image() {
@@ -59,7 +59,7 @@ show_image() {
 			# the bottom (e.g. right after ls), icat restores the cursor there and the
 			# padding newlines below scroll the freshly drawn image off the screen
 			printf '\033[H\033[J'
-			if kitten icat --clear --silent --stdin=no --transfer-mode=$mode \
+			if kitty +kitten icat --clear --silent --stdin=no --transfer-mode=$mode \
 				--place "${w}x${h}@0x0" -- "$1" 2>/dev/null; then
 				# kitty+no-tmux: match the padding to the image's real row count:
 				for i in $(seq 2 $h); do printf '\n'; done
@@ -150,7 +150,7 @@ show_pptx() {
 			h=$((rows - 3))
 			printf '\033[H\033[J'
 			printf 'Slide %d/%d -- %s\n' "$n" "$total" "${file##*/}"
-			kitten icat --clear --silent --stdin=no --transfer-mode=stream \
+			kitty +kitten icat --clear --silent --stdin=no --transfer-mode=stream \
 				--place "${cols}x${h}@0x1" -- "$slide" 2>/dev/null
 			i=2
 			while [ $i -le $((h + 1)) ]; do

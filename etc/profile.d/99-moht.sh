@@ -18,7 +18,7 @@ if [[ "$SHELL" =~ /bash ]]; then
 fi
 
 # General Linux Shortcuts
-alias l='LESS="${LESS:+$LESS }-X" less'
+alias l='LESS=-rS less'
 alias ll='ls -al --color=auto'
 alias lr='less -r'
 alias t='top'
@@ -26,7 +26,7 @@ alias c='cat'
 alias p='ps aux | less'
 alias p8='ping 8.8.8.8'
 alias pg='ping www.google.com.sg'
-alias ac='zcat -f'
+alias ka='killall.sh'
 alias open=xdg-open
 alias gtop="watch -n 1 \"nvidia-smi | grep '^| \{1,8\}[^ ]'\""
 alias gtop="watch -n 1 \"nvidia-smi --query-gpu=index,name,utilization.gpu,utilization.memory,temperature.gpu,power.draw,power.limit,memory.used,memory.total | sed s:utilization:util:g; echo; ollama ps 2>/dev/null\""
@@ -35,7 +35,7 @@ alias git_gc_all='git reflog expire --expire=now --all && git gc --aggressive --
 alias sedm="sed -e '1h;2,\$H;\$!d;g' -e"
 alias nv_run='DRI_PRIME=pci-0000_01_00_0 __VK_LAYER_NV_optimus=NVIDIA_only __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia'
 alias megaraid_check='/opt/MegaRAID/MegaCli/MegaCli64 -LdPdInfo -a0'
-alias sus="sudo -H env XAUTHORITY=$HOME/.Xauthority su"
+alias sus="sudo su"
 alias sul='sudo -i'
 alias showmyip='curl https://ipinfo.io/ip'
 alias ld_debug='LD_DEBUG=libs,files VK_LOADER_DEBUG=all'
@@ -50,6 +50,30 @@ alias py3="/opt/anaconda3/bin/python -i -c \"import os,sys,re,math,random;import
 alias apy="/opt/anaconda3/bin/python"
 alias tf="PYTHONPATH=/opt/anaconda3/PYTHONPATH/tf"
 alias test_pytorch="/opt/anaconda3/bin/python -c 'import torch;print(torch.cuda.is_available())'"
+
+function ac {
+    local f tmp pdf mime
+    for f in "$@"; do
+        [[ -f "$f" ]] || continue
+        mime=$(file -Lb --mime-type "$f")
+
+        case "${f,,}" in
+            *.doc|*.docx|*.xls|*.xlsx|*.ppt|*.pptx)
+                tmp=$(mktemp -d)
+                soffice --headless --convert-to pdf --outdir "$tmp" "$f" >/dev/null 2>&1 &&
+                    timg "$tmp/$(basename "${f%.*}").pdf"
+                rm -rf "$tmp"
+                ;;
+            *)
+                if [[ "$mime" == image/* || "$mime" == application/pdf ]]; then
+                    timg "$f"
+                else
+                    zcat -f -- "$f"
+                fi
+                ;;
+        esac
+    done
+}
 
 alias tls='tmux ls'
 ta() {
