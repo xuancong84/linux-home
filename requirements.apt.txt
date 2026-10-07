@@ -26,6 +26,7 @@ mpv
 gimp
 timg
 poppler-utils
+visidata
 
 # cargo
 xleak
