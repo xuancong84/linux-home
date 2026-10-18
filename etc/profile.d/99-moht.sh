@@ -851,6 +851,19 @@ norm_vol() {
 	fi
 }
 
+usb_speed() {
+	if [ $# == 0 ]; then
+		echo "Usage: $0 /dev/sdX"
+		return
+	fi
+	X=`basename $1`
+	d=$(readlink -f /sys/block/$X/device)
+	while [ ! -f "$d/speed" ]; do
+		d=${d%/*}
+	done
+	echo "$X: $(cat $d/speed) Mb/s ($(cat $d/product))"
+}
+
 ytdlp=
 if [ -s ~/anaconda3/bin/yt-dlp ]; then
 	ytdlp=~/anaconda3/bin/yt-dlp

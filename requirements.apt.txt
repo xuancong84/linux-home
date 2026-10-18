@@ -27,6 +27,12 @@ gimp
 timg
 poppler-utils
 visidata
+acpi-call-dkms
+ibus-libpinyin
+xdotool
+ydotool
+ydotoold
+iperf
 
 # cargo
 xleak
