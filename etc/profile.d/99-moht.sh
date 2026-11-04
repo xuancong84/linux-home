@@ -1,3 +1,5 @@
+[ -n "$BASH_VERSION" ] || return 0
+
 # MOHT-specific configs
 export CLAUDE_CODE_MAX_OUTPUT_TOKENS=32768
 
