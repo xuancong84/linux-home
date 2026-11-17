@@ -1,5 +1,5 @@
 
-session_name=beiwe
+session_name=startup
 cmds=("top"
 "# command-line 1"
 "# command-line 2"
@@ -15,13 +15,13 @@ tmux new-session -s $session_name -d -x 240 -y 60
 
 for i in `seq 0 $[${#cmds[*]}-1]`; do
 	sleep 0.5
-	tmux split-window
+	tmux -t $session_name split-window
 	sleep 0.5
-	tmux select-layout tile
+	tmux -t $session_name select-layout tile
 	sleep 0.5
-	tmux send-keys -l "${cmds[i]}"
+	tmux -t $session_name send-keys -l "${cmds[i]}"
 	sleep 0.5
-	tmux send-keys Enter
+	tmux -t $session_name send-keys Enter
 done
 
 

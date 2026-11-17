@@ -160,8 +160,38 @@ Notes:
 
 A ready-to-use pair of scripts that wrap all of this (including
 detecting whether the desktop is on X11 or native Wayland, so they skip
-the nested Weston step when it's not needed) live at `~/bin/ygysc-start.sh`
-and `~/bin/ygysc-stop.sh` — full listing in the appendix below.
+the nested Weston step when it's not needed, and backgrounding the app
+before stopping so it can save state — see §7) live at
+`bin/ygysc-start.sh` and `bin/ygysc-stop.sh` in this repo (hardlinked to
+`~/bin/ygysc-*.sh`). Key points from `ygysc-start.sh`, for adapting to a
+different app:
+
+```sh
+# detect seat0 session type, falls back to x11
+SESSION_TYPE=$(loginctl show-session "$seat0_session_id" -p Type --value)
+
+# X11 path: nested fullscreen Weston
+weston --backend=x11-backend.so --width="$W" --height="$H" --fullscreen \
+    --socket=waydroid-wayland &
+
+# Wayland path: just reuse the running compositor's own socket, no Weston
+
+export WAYLAND_DISPLAY=waydroid-wayland   # or the native socket name
+waydroid session start &
+
+# poll real boot completion, not just "has an IP"
+sudo waydroid shell -- getprop sys.boot_completed   # wait for "1"
+
+waydroid show-full-ui &
+sudo waydroid shell -- am start -n com.mygysc/com.github.tvbox.osc.ui.activity.HomeActivity
+```
+
+Swap the package/activity for a different app — find an installed app's
+launcher activity with:
+
+```sh
+sudo waydroid shell -- cmd package resolve-activity --brief <pkg>
+```
 
 ## 6. Audio (optional but usually wanted)
 
@@ -245,144 +275,34 @@ client list and never reconnected.
 Fix: `sudo systemctl restart vncserver-x11-serviced.service` (this will
 briefly drop your current VNC connection — reconnect after).
 
-## Appendix: launcher scripts
+## 7. Stopping gracefully (preserving app state, e.g. playback position)
 
-`~/bin/ygysc-start.sh`:
+`waydroid session stop` ultimately runs `lxc-stop -k` on the container —
+a hard kill of its init, with no `SIGPWR`/Android shutdown broadcast. No
+app gets `onPause()`/`onStop()`, so anything an app only saves there
+(most media players save resume position this way) is lost — it's like
+yanking power on a real device, not a clean shutdown.
+
+Fix: before stopping, send a `HOME` keyevent (same as a user pressing
+Home) and give it a moment — this reliably triggers the foreground
+activity's `onPause()`/`onStop()` through the normal lifecycle, *then*
+the hard stop is harmless:
 
 ```sh
-#!/bin/bash
-# Starts Waydroid full-screen on the Pi's local desktop and launches
-# 月光影视仓 (com.mygysc). Safe to re-run: skips any piece that's already
-# running.
-#
-# Works under either desktop session type:
-#   - X11 (e.g. LXDE-pi-x): nests a fullscreen Weston (X11 backend) to get
-#     a Wayland socket for Waydroid, same as before.
-#   - Native Wayland (e.g. LXDE-pi-labwc, LXDE-pi-wayfire): talks directly
-#     to the already-running compositor, no nested Weston needed.
-set -u
-
-PKG=com.mygysc
-ACTIVITY=com.github.tvbox.osc.ui.activity.HomeActivity
-LOGTAG=ygysc-start
-
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-
-log() { echo "[$LOGTAG] $*"; }
-
-# Find the seat0 (physical display) session's type: x11 or wayland. Falls
-# back to x11 if it can't be determined.
-SESSION_TYPE=x11
-for s in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'); do
-    seat=$(loginctl show-session "$s" -p Seat --value 2>/dev/null)
-    if [ "$seat" = "seat0" ]; then
-        t=$(loginctl show-session "$s" -p Type --value 2>/dev/null)
-        [ -n "$t" ] && SESSION_TYPE="$t"
-        break
-    fi
-done
-
-if [ "$SESSION_TYPE" = "wayland" ]; then
-    log "native Wayland session detected, skipping nested Weston"
-    comp_pid=$(pgrep -x labwc 2>/dev/null || pgrep -x wayfire 2>/dev/null || true)
-    native_wayland_display=""
-    if [ -n "$comp_pid" ]; then
-        native_wayland_display=$(tr '\0' '\n' <"/proc/$comp_pid/environ" 2>/dev/null \
-            | awk -F= '$1=="WAYLAND_DISPLAY"{print $2; exit}')
-    fi
-    WAYLAND_SOCK="${native_wayland_display:-wayland-0}"
-    log "using native compositor's Wayland display: $WAYLAND_SOCK"
-else
-    log "X11 session detected, using nested fullscreen Weston"
-    WAYLAND_SOCK=waydroid-wayland
-
-    # Always target the Pi's real local desktop display.
-    export DISPLAY=:0
-
-    # Make sure we can talk to the local X display (needed when run over
-    # SSH rather than from a terminal inside the desktop session).
-    if ! DISPLAY="$DISPLAY" xdpyinfo >/dev/null 2>&1; then
-        cookie=$(sudo xauth -f "/var/run/lightdm/root/$DISPLAY" list 2>/dev/null | head -1)
-        if [ -n "$cookie" ]; then
-            xauth add $cookie
-        fi
-    fi
-
-    read -r SCREEN_W SCREEN_H <<<"$(DISPLAY="$DISPLAY" xrandr 2>/dev/null | awk -F'current ' '/current/{split($2,a,",");gsub(/ /,"",a[1]);gsub(/x/," ",a[1]);print a[1];exit}')"
-    SCREEN_W="${SCREEN_W:-1920}"
-    SCREEN_H="${SCREEN_H:-1080}"
-
-    if [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_SOCK" ]; then
-        log "starting weston fullscreen (${SCREEN_W}x${SCREEN_H})"
-        DISPLAY="$DISPLAY" weston --backend=x11-backend.so \
-            --width="$SCREEN_W" --height="$SCREEN_H" --fullscreen \
-            --socket="$WAYLAND_SOCK" >/tmp/ygysc-weston.log 2>&1 &
-        for i in $(seq 1 30); do
-            [ -S "$XDG_RUNTIME_DIR/$WAYLAND_SOCK" ] && break
-            sleep 0.5
-        done
-    else
-        log "weston already running, reusing it"
-    fi
-fi
-
-export WAYLAND_DISPLAY="$WAYLAND_SOCK"
-
-if ! waydroid status 2>/dev/null | grep -q "Session:[[:space:]]*RUNNING"; then
-    log "starting waydroid session"
-    waydroid session start >/tmp/ygysc-session.log 2>&1 &
-else
-    log "waydroid session already running"
-fi
-
-log "waiting for the android container to finish booting"
-for i in $(seq 1 60); do
-    booted=$(sudo waydroid shell -- getprop sys.boot_completed 2>/dev/null | tr -d '[:space:]')
-    [ "$booted" = "1" ] && { log "container fully booted"; break; }
-    sleep 1
-done
-
-waydroid show-full-ui >/tmp/ygysc-ui.log 2>&1 &
+sudo waydroid shell -- input keyevent KEYCODE_HOME
 sleep 2
-
-log "launching $PKG"
-for i in $(seq 1 15); do
-    out=$(sudo waydroid shell -- am start -n "$PKG/$ACTIVITY" 2>&1)
-    echo "$out"
-    echo "$out" | grep -q "Error" || break
-    sleep 1
-done
+waydroid session stop
 ```
 
-`~/bin/ygysc-stop.sh`:
+Verified this actually fires the lifecycle transition (not just an
+inert keypress) via `logcat`:
 
-```sh
-#!/bin/bash
-# Stops the fullscreen Waydroid UI started by ygysc-start.sh. The Waydroid
-# container itself is left running (managed by systemd) so the next start
-# is fast; only the on-screen session/compositor is torn down.
-set -u
-LOGTAG=ygysc-stop
-log() { echo "[$LOGTAG] $*"; }
-
-log "stopping waydroid session"
-waydroid session stop >/dev/null 2>&1
-
-# Only closes anything if ygysc-start.sh actually started a nested Weston
-# (X11 session case); a no-op on native Wayland, where there's nothing to
-# close here.
-if pgrep -f "weston --backend=x11-backend.so .*--socket=waydroid-wayland" >/dev/null 2>&1; then
-    log "closing nested weston"
-    pkill -f "weston --backend=x11-backend.so .*--socket=waydroid-wayland" 2>/dev/null
-fi
-
-log "done"
+```
+ActivityTaskManager: START u0 {act=android.intent.action.MAIN
+    cat=[android.intent.category.HOME] ... cmp=com.android.launcher3/...}
 ```
 
-(Both reference the specific package `com.mygysc` / activity
-`com.github.tvbox.osc.ui.activity.HomeActivity` — swap those two
-variables for a different app. Find an installed app's launcher activity
-with `sudo waydroid shell -- cmd package resolve-activity --brief <pkg>`.)
+`bin/ygysc-stop.sh` in this repo does this automatically.
 
 ## Appendix: unrelated pitfall hit while rebooting for this
 
