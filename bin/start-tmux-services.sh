@@ -15,13 +15,13 @@ tmux new-session -s $session_name -d -x 240 -y 60
 
 for i in `seq 0 $[${#cmds[*]}-1]`; do
 	sleep 0.5
-	tmux -t $session_name split-window
+	tmux split-window -t $session_name
 	sleep 0.5
-	tmux -t $session_name select-layout tile
+	tmux select-layout -t $session_name tile
 	sleep 0.5
-	tmux -t $session_name send-keys -l "${cmds[i]}"
+	tmux send-keys -t $session_name -l "${cmds[i]}"
 	sleep 0.5
-	tmux -t $session_name send-keys Enter
+	tmux send-keys -t $session_name Enter
 done
 
 

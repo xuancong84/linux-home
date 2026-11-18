@@ -32,12 +32,12 @@ done
 
 if [ "$SESSION_TYPE" = "wayland" ]; then
     log "native Wayland session detected, skipping nested Weston"
-    comp_pid=$(pgrep -x labwc 2>/dev/null || pgrep -x wayfire 2>/dev/null || true)
-    native_wayland_display=""
-    if [ -n "$comp_pid" ]; then
-        native_wayland_display=$(tr '\0' '\n' <"/proc/$comp_pid/environ" 2>/dev/null \
-            | awk -F= '$1=="WAYLAND_DISPLAY"{print $2; exit}')
-    fi
+    # The compositor (labwc/wayfire) creates the socket but doesn't have
+    # WAYLAND_DISPLAY in its own environment, so reading its /proc/*/environ
+    # doesn't work. Find the live socket directly instead -- this also
+    # works when run over SSH, where WAYLAND_DISPLAY isn't inherited.
+    native_wayland_display=$(basename "$(ls -t "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null \
+        | grep -v '\.lock$' | head -1)" 2>/dev/null)
     WAYLAND_SOCK="${native_wayland_display:-wayland-0}"
     log "using native compositor's Wayland display: $WAYLAND_SOCK"
 else
